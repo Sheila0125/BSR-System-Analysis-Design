@@ -1,0 +1,26 @@
+<wxs module="ui" src="../../shared/ui/presentation.wxs" />
+<view class="rental-page">
+  <view class="page-heading"><text class="eyebrow">行程有变化，我们一起调整</text><text class="page-title">申请租赁变更</text><text class="description">告诉门店你的需求，核定方案后再确认。</text></view>
+  <text wx:if="{{contract && contract.status === 'ENDED'}}" class="notice">仅在原租赁日期内、已归还装备尚有未完成的正式退款时，可申请后续减租，由门店核对。</text>
+  <text wx:if="{{error}}" class="error">{{ui.message(error)}}</text><navigator wx:if="{{error}}" class="text-link" url="/pages/identity/login">重新登录 ›</navigator>
+  <view wx:if="{{loading}}" class="loading-state">正在核对合同…</view>
+  <view class="form-card"><text class="section-title">变更需求</text>
+    <text class="form-card__label">希望办理的门店编号</text><input value="{{storeId}}" type="number" bindinput="store" placeholder="请输入服务门店编号" placeholder-class="input-placeholder" disabled="{{submitting}}" />
+    <text class="form-card__label">变更类型</text><picker range="{{ui.labels(types)}}" value="{{typeIndex}}" bindchange="type" disabled="{{submitting}}"><view class="picker-value">{{ui.label(types[typeIndex])}}<text class="picker-arrow">⌄</text></view></picker>
+    <text class="form-card__label">具体需求</text><textarea value="{{note}}" bindinput="note" maxlength="500" placeholder="请说明需要变更或归还的装备，最多500字" placeholder-class="input-placeholder" disabled="{{submitting}}" />
+    <view wx:if="{{types[typeIndex] !== 'ADD'}}" class="return-intent">
+      <text class="form-card__label">拟退回的原合同项目（选填）</text>
+      <text class="description">仅记录意向，不代表已归还。请交由门店检查实物后办理。</text>
+      <checkbox-group bindchange="returned">
+        <label wx:for="{{returnOptions}}" wx:key="itemId" class="return-intent__item">
+          <checkbox value="{{item.itemId}}" checked="{{item.checked}}" disabled="{{submitting || submittedId}}" color="#286a8e" />
+          <view><text>雪具 {{item.equipmentId}}</text><text class="caption">合同项目 {{item.itemId}}</text></view>
+        </label>
+      </checkbox-group>
+      <text wx:if="{{!returnOptions.length}}" class="caption">当前没有可选择的原合同项目，可在说明中联系门店核对。</text>
+    </view>
+    <text class="notice">提交申请不会直接改变装备、归还记录或费用。门店核定后，你可查看方案与报价。</text>
+    <button type="primary" bindtap="submit" loading="{{submitting}}" disabled="{{submitting || submittedId || !contract || (contract.status !== 'ACTIVE' && contract.status !== 'ENDED')}}">提交变更申请</button>
+    <text wx:if="{{submittedId}}" class="success break-id">申请 {{submittedId}} 已提交，可返回合同查看处理进度。</text>
+  </view>
+</view>

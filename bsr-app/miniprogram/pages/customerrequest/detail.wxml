@@ -1,0 +1,17 @@
+<wxs module="ui" src="../../shared/ui/presentation.wxs" />
+<view class="customer-page">
+  <view class="page-heading"><text class="eyebrow">每一步进度，都在这里</text><text class="page-title">申请详情</text></view>
+  <view wx:if="{{loading}}" class="loading-state">正在读取申请详情…</view>
+  <text wx:if="{{errorMessage}}" class="customer-page__error">{{ui.message(errorMessage)}}</text><text wx:if="{{successMessage}}" class="customer-page__success">{{ui.message(successMessage)}}</text>
+  <view wx:if="{{request}}">
+    <view class="detail-card"><view class="card-row"><text class="section-title break-id">{{request.requestNumber}}</text><text class="status-badge">{{ui.label(request.status)}}</text></view>
+      <view class="data-row"><text class="data-label">租赁开始</text><text class="data-value">{{request.rentalStartDate}}</text></view>
+      <view class="data-row"><text class="data-label">租赁时长</text><text class="data-value">{{request.rentalDays}} 天</text></view>
+      <view class="data-row"><text class="data-label">滑雪水平</text><text class="data-value">{{ui.label(request.skillLevel)}}</text></view>
+      <view class="data-row"><text class="data-label">服务门店</text><text class="data-value">{{request.serviceStoreId}}</text></view>
+    </view>
+    <view class="detail-card"><text class="section-title">所需装备</text><view wx:for="{{request.items}}" wx:key="index" class="item-card"><view class="card-row"><text class="item-name">{{ui.label(item.equipmentCategory)}}</text><text class="data-value">× {{item.quantity}}</text></view><text wx:if="{{item.fittingNote}}" class="item-meta">{{item.fittingNote}}</text></view></view>
+    <view wx:if="{{request.supplements.length > 0}}" class="detail-card"><text class="section-title">资料补充记录</text><view wx:for="{{request.supplements}}" wx:key="cycleNumber" class="supplement-cycle"><text class="cycle-number">第 {{item.cycleNumber}} 次补充</text><text class="cycle-reason">{{item.reason}}</text><text wx:if="{{item.customerResponse}}" class="item-meta">我的回复：{{item.customerResponse}}</text><text wx:else class="item-meta">等待你的回复</text></view></view>
+    <view wx:if="{{request.status === 'NEEDS_INFO'}}" class="form-card"><text class="section-title">门店需要你补充资料</text><text class="description">请根据最近一条补充说明填写回复。</text><textarea class="response-input" value="{{responseDraft}}" maxlength="500" placeholder="在这里补充信息，最多500字" placeholder-class="input-placeholder" bindinput="onResponse" disabled="{{submitting}}" /><button type="primary" loading="{{submitting}}" disabled="{{submitting}}" bindtap="resubmitSupplement">发送补充资料</button></view>
+  </view>
+</view>

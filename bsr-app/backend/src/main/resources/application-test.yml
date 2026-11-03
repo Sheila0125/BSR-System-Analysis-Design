@@ -1,0 +1,15 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:mysql://${TEST_DB_HOST}:${TEST_DB_PORT}/${TEST_DB_NAME}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+    username: ${TEST_DB_USERNAME}
+    password: ${TEST_DB_PASSWORD}
+    hikari:
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+  jpa:
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC

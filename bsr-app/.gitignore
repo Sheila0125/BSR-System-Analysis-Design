@@ -1,0 +1,31 @@
+# Build outputs
+backend/target/
+frontend/dist/
+frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+miniprogram/dist/
+
+# Dependency caches
+frontend/node_modules/
+miniprogram/node_modules/
+.mvn/wrapper/maven-wrapper.jar
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+env/*.local
+miniprogram/project.private.config.json
+
+# IDE and operating-system files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+tmp/

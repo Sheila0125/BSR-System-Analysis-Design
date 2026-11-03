@@ -1,0 +1,22 @@
+{
+  "pages": [
+    "pages/identity/login",
+    "pages/customerrequest/home",
+    "pages/customerrequest/profile",
+    "pages/customerrequest/create",
+    "pages/customerrequest/detail",
+    "pages/rental/list",
+    "pages/rental/detail",
+    "pages/rental/confirm",
+    "pages/rental/change",
+    "pages/rental/invoice"
+  ],
+  "window": {
+    "navigationBarTitleText": "BSR 雪具租赁",
+    "navigationBarBackgroundColor": "#f1f6fa",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f1f6fa"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

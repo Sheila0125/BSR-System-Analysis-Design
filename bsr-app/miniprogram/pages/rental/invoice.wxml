@@ -1,0 +1,46 @@
+<wxs module="ui" src="../../shared/ui/presentation.wxs" />
+<view class="rental-page invoice-page">
+  <view class="page-heading"><text class="eyebrow">我的租赁 · 费用与凭证</text><text class="page-title">电子发票</text><text class="caption">课程演示电子账单 · 虚拟付款不扣款</text></view>
+  <text wx:if="{{error}}" class="error">{{ui.message(error)}}</text>
+  <text wx:if="{{paymentMessage}}" class="success">{{paymentMessage}}</text>
+  <button class="button-plain refresh-button" size="mini" bindtap="refreshInvoice" disabled="{{loading || paying}}">刷新账单与付款结果</button>
+  <view wx:if="{{loading}}" class="loading-state">正在读取发票…</view>
+  <view wx:if="{{invoice}}">
+    <view class="panel invoice-heading"><text class="invoice-brand">BSR</text><text class="invoice-subtitle">雪具租赁 · 电子账单</text><text class="invoice-number break-id">{{invoice.invoiceNumber}}</text><text class="status-badge">{{ui.label(invoice.contractStatus)}}</text>
+      <view class="data-row"><text class="data-label">顾客</text><text class="data-value">{{invoice.customerName}} · {{invoice.customerNumber}}</text></view>
+      <view class="data-row"><text class="data-label">服务门店</text><text class="data-value">{{invoice.storeName}}</text></view>
+      <view class="data-row"><text class="data-label">合同编号</text><text class="data-value">{{invoice.contractNumber}}</text></view>
+      <view class="data-row"><text class="data-label">账单日期</text><text class="data-value">{{invoice.contractDate}}</text></view>
+      <view class="data-row"><text class="data-label">约定租期</text><text class="data-value">{{invoice.rentalStartDate}} 起 · {{invoice.rentalDays}} 天</text></view>
+    </view>
+    <view class="balance-grid">
+      <view class="balance-card"><text class="balance-label">合同应付合计</text><text class="balance-value">{{invoice.amountDue}}</text><text class="currency">{{invoice.currency}}</text></view>
+      <view class="balance-card"><text class="balance-label">成功付款合计</text><text class="balance-value">{{invoice.totalPaid}}</text><text class="currency">{{invoice.currency}}</text></view>
+      <view class="balance-card balance-card--due"><text class="balance-label">待支付</text><text class="balance-value">{{invoice.outstandingPayment}}</text><text class="currency">{{invoice.currency}}</text></view>
+      <view class="balance-card"><text class="balance-label">待退款</text><text class="balance-value">{{invoice.outstandingRefund}}</text><text class="currency">{{invoice.currency}}</text></view>
+    </view>
+    <text class="caption refunded">已成功退款 {{invoice.totalRefunded}} {{invoice.currency}} · 失败流水不计入付款或退款合计</text>
+    <view wx:if="{{invoice.contractStatus === 'DRAFT' || invoice.contractStatus === 'PENDING_CONFIRMATION'}}" class="notice">当前为账单预览，请先核对并确认合同，再进行模拟付款。</view>
+    <view wx:if="{{selectedCharge}}" class="panel cashier">
+      <text class="eyebrow">仅供课程操作演示</text><text class="section-title">虚拟收银台</text><text class="description">{{ui.label(selectedCharge.type)}} · 本次支付 {{selectedCharge.outstandingAmount}} {{invoice.currency}}</text>
+      <text class="notice">不会扣除任何真实资金。金额由系统按未付余额确定。</text>
+      <radio-group bindchange="chooseOutcome"><label class="outcome-option"><radio value="SUCCEEDED" checked="{{outcome === 'SUCCEEDED'}}" disabled="{{paying || attemptKey}}" />模拟支付成功</label><label class="outcome-option"><radio value="FAILED" checked="{{outcome === 'FAILED'}}" disabled="{{paying || attemptKey}}" />模拟支付失败</label></radio-group>
+      <text wx:if="{{attemptKey}}" class="notice">结果尚未确认时，重试会沿用同一笔请求。也可刷新账单核对最新结果。</text>
+      <view class="button-row"><button class="button-plain" bindtap="cancelPayment" disabled="{{paying || attemptKey}}">取消</button><button type="primary" bindtap="pay" loading="{{paying}}" disabled="{{paying || loading}}">{{attemptKey ? '重试原付款请求' : '确认模拟付款'}}</button></view>
+    </view>
+    <view class="panel"><text class="section-title">费用明细与付款凭证</text><text wx:if="{{invoice.charges.length === 0}}" class="description">本合同没有需支付的费用。</text>
+      <view wx:for="{{invoice.charges}}" wx:key="chargeId" class="charge-card">
+        <view class="card-row"><text class="item-name">{{ui.label(item.type)}}</text><text class="status-badge">{{ui.label(item.status)}}</text></view>
+        <text class="charge-amount">{{item.amount}} {{invoice.currency}}</text><text class="item-meta">{{item.type === 'REFUND' ? '尚待退款' : '尚待支付'}} · {{item.outstandingAmount}} {{invoice.currency}}</text>
+        <button wx:if="{{item.canSimulatePayment}}" class="pay-entry" size="mini" type="primary" data-id="{{item.chargeId}}" bindtap="openPayment" disabled="{{paying || loading}}">模拟付款 · 不扣款</button>
+        <text wx:if="{{item.type === 'REFUND' && item.outstandingAmount !== '0.00'}}" class="description">退款由门店处理，请联系服务门店核对。</text>
+        <view wx:for="{{item.transactions}}" wx:for-item="transaction" wx:key="transactionId" class="transaction-card">
+          <view class="card-row"><text class="transaction-source">{{transaction.source === 'SIMULATED' ? '顾客模拟付款 · 不扣款' : '外部交易 · 员工登记'}}</text><text class="status-badge">{{ui.label(transaction.status)}}</text></view>
+          <text class="item-meta">{{transaction.amount}} {{invoice.currency}} · {{transaction.processedAt || transaction.recordedAt}}</text><text class="item-meta break-id">{{transaction.externalId}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="panel"><text class="section-title">雪具与价格快照</text><view wx:for="{{invoice.items}}" wx:key="itemId" class="snapshot-row"><view class="card-row"><text class="item-name break-id">装备 {{item.equipmentId}}</text><text class="status-badge">{{ui.label(item.status)}}</text></view><text class="item-meta">日租金快照 {{item.dailyRateSnapshot}} {{invoice.currency}} / 天</text></view><text class="description">初始租金按逐件日租金快照 × 约定整日天数计算。已确认的补缴、退款另列费用；历史快照不随现价重算。</text></view>
+    <text class="caption invoice-footer">本页为课程演示凭证，不属于税务发票。普通提前归还不自动退款。</text>
+  </view>
+</view>

@@ -1,0 +1,16 @@
+<wxs module="ui" src="../../shared/ui/presentation.wxs" />
+<view class="rental-page">
+  <view class="page-heading"><text class="eyebrow">出发前，再确认一次</text><text class="page-title">确认租赁合同</text><text class="description">请核对租赁日期、装备与合同金额。</text></view>
+  <view wx:if="{{loading}}" class="loading-state">正在获取合同…</view><text wx:if="{{error}}" class="error">{{ui.message(error)}}</text><navigator wx:if="{{error}}" class="text-link" url="/pages/identity/login">重新登录 ›</navigator>
+  <view wx:if="{{contract}}" class="panel"><view class="card-row"><text class="section-title break-id">{{contract.contractNumber}}</text><text class="status-badge">{{ui.label(contract.status)}}</text></view><view class="data-row"><text class="data-label">开始日期</text><text class="data-value">{{contract.rentalStartDate}}</text></view><view class="data-row"><text class="data-label">租赁时长</text><text class="data-value">{{contract.rentalDays}} 天</text></view>
+    <view class="amount-panel"><text class="amount-label">合同应付合计</text><text class="amount">{{contract.amountDue}}</text></view><text class="section-title">装备清单</text>
+    <view wx:for="{{contract.items}}" wx:key="itemId" class="item-card"><text class="item-name break-id">装备 {{item.equipmentId}}</text><text class="item-meta">日租金快照 · {{item.dailyRateSnapshot}} / 天</text></view>
+    <text class="section-title">计费依据</text>
+    <text class="description">初始租金为各件装备日租金快照 × {{contract.rentalDays}} 个约定整日后求和。单价取建约时的装备定价，历史快照不随现价变动；按 Europe/Oslo 本地日历整日计费，不按小时折算。</text>
+    <text class="description">普通提前归还不自动退款；正式调整只退尚未开始的剩余整日，新增装备包含调整当日。调整补缴或退款另列费用，以服务端核定金额为准。合同应付合计包含已确认调整，不是当前未付余额。</text>
+    <text class="notice">确认后可返回租赁详情，选择“查看发票 / 模拟付款”体验付款流程。模拟付款不扣款；外部付款仍可由门店核实登记。</text>
+    <navigator wx:if="{{contract.status !== 'PENDING_CONFIRMATION'}}" class="text-link" url="/pages/rental/invoice?id={{id}}">查看发票 / 模拟付款 ›</navigator>
+    <button type="primary" disabled="{{submitting || contract.status !== 'PENDING_CONFIRMATION'}}" loading="{{submitting}}" bindtap="accept">确认合同内容与金额</button>
+    <button class="button-plain reject-button" disabled="{{submitting || contract.status !== 'PENDING_CONFIRMATION'}}" bindtap="reject">暂不接受，退回草稿</button>
+  </view>
+</view>

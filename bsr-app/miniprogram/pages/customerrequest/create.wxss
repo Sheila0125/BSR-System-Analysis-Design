@@ -1,0 +1,10 @@
+.request-item { margin:26rpx 0; padding:24rpx; border:1rpx solid #e2edf5; border-radius:20rpx; background:#fafdff; }
+.request-item__header { display:flex; align-items:center; justify-content:space-between; }
+.request-item__title { color:#587e96; font-size:26rpx; font-weight:600; }
+.remove-item { background:#fff1ee; color:#ab6a60; }
+.request-item .form-card__label { margin-top:20rpx; }
+.duplicate-confirm { display:flex; align-items:center; gap:16rpx; margin-top:24rpx; padding:20rpx; border-radius:16rpx; background:#fff7e9; color:#a48957; font-size:25rpx; }
+.duplicate-confirm text { flex:1; }
+.picker-arrow { float:right; color:#769bb1; }
+.field-help { display:block; margin-top:10rpx; font-size:21rpx; color:#96a8b5; }
+picker + input { margin-top:14rpx; }

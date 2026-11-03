@@ -1,0 +1,4 @@
+.picker-arrow { float:right; color:#769bb1; }
+.return-intent { margin:28rpx 0; padding:20rpx; background:#f1f7fb; border-radius:16rpx; }
+.return-intent__item { display:flex; align-items:center; gap:12rpx; padding:20rpx 0; overflow-wrap:anywhere; }
+.return-intent__item .caption { display:block; }

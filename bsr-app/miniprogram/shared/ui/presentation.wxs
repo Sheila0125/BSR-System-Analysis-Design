@@ -1,0 +1,54 @@
+var names = {
+  PENDING: '待处理', SUBMITTED: '已提交', NEEDS_INFO: '待补充资料', ACCEPTED: '已受理',
+  UNAVAILABLE: '暂无法满足', CONVERTED: '已转为合同', DRAFT: '草稿',
+  PENDING_CONFIRMATION: '待确认', PENDING_PAYMENT: '待付款', ACTIVE: '租赁中',
+  PENDING_SETTLEMENT: '待结算', ENDED: '已结束', CANCELLED: '已取消',
+  RESERVED: '已预留', ISSUED: '已发放', RENTED: '已租出', RETURNED: '已归还',
+  PENDING_ISSUE: '待发放', RETURN_INSPECTION: '归还检查中', LOST: '遗失',
+  INITIAL: '初始租赁费', PAYMENT: '付款', SUPPLEMENT: '补缴', REFUND: '退款',
+  SETTLED: '已结清', UNSETTLED: '待结清', SUCCEEDED: '成功', FAILED: '失败',
+  SUCCESS: '成功', FAILURE: '失败', UNKNOWN: '结果待确认', CONFIRMED: '已确认',
+  PROCESSING: '办理中', COMPLETED: '已完成', REJECTED: '已拒绝', DECLINED: '已拒绝',
+  ADD: '新增装备', REMOVE: '减少装备', REPLACE: '更换装备', PARTIAL_RETURN: '部分归还',
+  REPLACE_IN: '更换新增', REPLACE_OUT: '更换退回',
+  BEGINNER: '初级', INTERMEDIATE: '中级', ADVANCED: '高级',
+  SKI: '双板', SNOWBOARD: '单板', BOOTS: '雪鞋', SKI_BOOTS: '双板雪鞋',
+  POLES: '雪杖', HELMET: '头盔'
+};
+var messages = {
+  'The secure BSR API origin is not configured.': '服务连接尚未配置，请联系管理员。',
+  'The BSR API origin is not configured.': '服务连接尚未配置，请联系管理员。',
+  'The mini program API origin is not configured.': '服务连接尚未配置，请联系管理员。',
+  'Sign-in failed. Check the connection and try again.': '登录失败，请检查连接后重试。',
+  'Could not load your rental requests.': '暂时无法加载申请，请稍后重试。',
+  'Could not load your profile.': '暂时无法加载尺寸资料，请稍后重试。',
+  'Could not save. Your input is still here.': '保存失败，已保留你填写的内容。',
+  'Measurements saved.': '尺寸资料已保存。',
+  'Could not load this rental request.': '暂时无法加载申请详情，请稍后重试。',
+  'Could not submit. Your input is still here.': '提交失败，已保留你填写的内容。',
+  'Rental days and quantity must be positive whole numbers.': '租赁天数和装备数量请填写正整数。',
+  'This request is not waiting for supplemental information.': '当前申请无需补充资料，请刷新查看进度。',
+  'Enter a reply of at most 500 characters.': '请填写补充说明，最多500字。',
+  'Could not send your reply. Your input is still here.': '发送失败，已保留你的回复。',
+  'Your information was sent and the request is pending review again.': '补充资料已发送，请等待门店处理。',
+  'Could not complete this request. Your input is retained.': '操作暂未完成，已保留填写内容。',
+  'A valid identifier string is required.': '请检查门店或记录编号是否正确。',
+  'Select a change type and enter a note of at most 500 characters.': '请选择变更类型，说明最多500字。',
+  'Log in again': '登录已失效，请重新登录。', 'Sign in again': '登录已失效，请重新登录。'
+};
+function label(value) {
+  if (value === undefined || value === null || value === '') return '—';
+  var code = '' + value;
+  var translated = names[code];
+  return typeof translated === 'string' ? translated : code;
+}
+function labels(values) {
+  var result = [];
+  for (var i = 0; i < values.length; i++) result.push(label(values[i]));
+  return result;
+}
+function message(value) {
+  var translated = messages[value];
+  return typeof translated === 'string' ? translated : value;
+}
+module.exports = { label: label, labels: labels, message: message };

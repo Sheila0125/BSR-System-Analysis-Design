@@ -1,0 +1,9 @@
+{
+  "desc": "BSR customer pages are not indexed during foundation development.",
+  "rules": [
+    {
+      "action": "disallow",
+      "page": "*"
+    }
+  ]
+}

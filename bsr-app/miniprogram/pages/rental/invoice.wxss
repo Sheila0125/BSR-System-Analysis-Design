@@ -1,0 +1,22 @@
+.invoice-heading { border-top:8rpx solid #164c6c; }
+.invoice-brand { display:block; font-size:50rpx; font-weight:750; letter-spacing:8rpx; color:#164c6c; }
+.invoice-subtitle { display:block; color:#7793a4; font-size:24rpx; }
+.invoice-number { display:block; font-size:24rpx; margin:24rpx 0 16rpx; color:#3f6176; }
+.refresh-button { margin:0 0 26rpx; }
+.balance-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18rpx; }
+.balance-card { min-width:0; padding:26rpx 22rpx; border:1rpx solid #e2eaf0; border-radius:22rpx; background:#fff; }
+.balance-card--due { color:#fff; background:#164c6c; border-color:#164c6c; }
+.balance-label,.currency { display:block; font-size:23rpx; opacity:.7; }
+.balance-value { display:block; font-size:40rpx; line-height:1.4; font-weight:700; word-break:break-all; }
+.currency { font-size:20rpx; }
+.refunded { margin:18rpx 4rpx 30rpx; line-height:1.7; }
+.charge-card { padding-top:26rpx; margin-top:26rpx; border-top:1rpx solid #e3edf4; }
+.charge-amount { display:block; font-size:36rpx; font-weight:650; margin-top:12rpx; }
+.pay-entry { display:block; margin-top:22rpx; }
+.cashier { border:2rpx solid #8cb9cb; }
+.cashier .section-title { margin-top:12rpx; }
+.outcome-option { display:flex; align-items:center; gap:12rpx; padding:20rpx 0; font-size:27rpx; }
+.transaction-card { padding:20rpx; margin-top:18rpx; border-radius:16rpx; background:#f3f7fa; }
+.transaction-source { color:#38667e; font-size:23rpx; min-width:0; }
+.snapshot-row { padding:22rpx 0; border-bottom:1rpx solid #edf3f7; }
+.invoice-footer { margin:0 8rpx 22rpx; font-size:22rpx; line-height:1.8; }

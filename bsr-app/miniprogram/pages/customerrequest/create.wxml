@@ -1,0 +1,25 @@
+<wxs module="ui" src="../../shared/ui/presentation.wxs" />
+<view class="customer-page">
+  <view class="customer-page__hero"><text class="customer-page__eyebrow">把期待，变成下一次出发</text><text class="customer-page__title">新建租赁申请</text><text class="description">填写行程和装备需求，门店会为你核对安排。</text></view>
+  <view class="form-card">
+    <text class="section-title">01 · 你的行程</text>
+    <text class="form-card__label">服务门店编号</text><input value="{{serviceStoreId}}" type="number" placeholder="请输入门店提供的编号" placeholder-class="input-placeholder" bindinput="onStore" disabled="{{submitting}}" />
+    <text class="form-card__label">租赁开始日期</text><picker mode="date" value="{{rentalStartDate}}" bindchange="onStartDate" disabled="{{submitting}}"><view class="picker-value">{{rentalStartDate || '请选择出发日期'}}<text class="picker-arrow">⌄</text></view></picker>
+    <text class="form-card__label">租赁天数</text><input value="{{rentalDays}}" type="number" placeholder="请输入整天数" placeholder-class="input-placeholder" bindinput="onRentalDays" disabled="{{submitting}}" />
+    <text class="form-card__label">滑雪水平</text><picker range="{{skillLabels}}" value="{{skillIndex}}" bindchange="onSkillSelection" disabled="{{submitting}}"><view class="picker-value">{{skillIndex === 3 ? '其他水平（手动填写）' : skillLevel ? ui.label(skillLevel) : '请选择你的滑雪水平'}}<text class="picker-arrow">⌄</text></view></picker>
+    <input wx:if="{{skillIndex === 3}}" value="{{skillLevel}}" maxlength="20" placeholder="请输入门店认可的水平描述" placeholder-class="input-placeholder" bindinput="onSkill" disabled="{{submitting}}" />
+  </view>
+  <view class="form-card">
+    <text class="section-title">02 · 装备需求</text><text class="description">可以添加多种装备，并写下合身需求。</text>
+    <view wx:for="{{items}}" wx:for-index="itemIndex" wx:key="index" class="request-item">
+      <view class="request-item__header"><text class="request-item__title">装备 {{itemIndex + 1}}</text><button wx:if="{{items.length > 1}}" size="mini" class="remove-item" data-index="{{itemIndex}}" bindtap="removeItem" disabled="{{submitting}}">移除</button></view>
+      <text class="form-card__label">装备类别</text><input value="{{item.equipmentCategory}}" maxlength="40" placeholder="如 SKI（双板）、BOOTS（雪鞋）" placeholder-class="input-placeholder" data-index="{{itemIndex}}" bindinput="onCategory" disabled="{{submitting}}" />
+      <text class="form-card__label">数量</text><input value="{{item.quantity}}" type="number" data-index="{{itemIndex}}" bindinput="onQuantity" disabled="{{submitting}}" />
+      <text class="form-card__label">合身说明 · 选填</text><textarea value="{{item.fittingNote}}" maxlength="255" placeholder="例如偏好的长度、穿戴习惯等" placeholder-class="input-placeholder" data-index="{{itemIndex}}" bindinput="onFittingNote" disabled="{{submitting}}" />
+    </view>
+    <button wx:if="{{items.length < 20}}" class="button-secondary" bindtap="addItem" disabled="{{submitting}}">＋ 添加一种装备</button>
+    <view wx:if="{{duplicateRequired}}" class="duplicate-confirm"><text>已有一份待处理申请。如需继续新建，请开启右侧确认。</text><switch color="#286a8e" checked="{{confirmDuplicate}}" bindchange="onConfirmDuplicate" /></view>
+    <text wx:if="{{errorMessage}}" class="customer-page__error">{{ui.message(errorMessage)}}</text><text class="notice">提交申请后，门店确认装备与合同；申请阶段暂不预留装备。</text>
+    <button type="primary" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submit">提交租赁申请</button>
+  </view>
+</view>

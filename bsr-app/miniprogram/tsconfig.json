@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "lib": ["ES2020"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noEmit": true,
+    "types": ["miniprogram-api-typings"],
+    "skipLibCheck": false
+  },
+  "include": [
+    "app.ts",
+    "pages/**/*.ts",
+    "shared/**/*.ts"
+  ],
+  "exclude": ["dist", "node_modules"]
+}

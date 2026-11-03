@@ -1,0 +1,35 @@
+<wxs module="ui" src="../../shared/ui/presentation.wxs" />
+<view class="customer-page with-nav">
+  <view class="customer-page__hero"><text class="customer-page__eyebrow">为下一次滑行做好准备</text><text class="customer-page__title">我的资料</text><text class="description">{{fullName || '完善资料，轻松开启雪上旅程'}}<text wx:if="{{customerNumber}}"> · {{customerNumber}}</text></text></view>
+  <view wx:if="{{loading}}" class="loading-state">正在读取个人资料…</view>
+  <text wx:if="{{errorMessage}}" class="customer-page__error">{{ui.message(errorMessage)}}</text>
+  <text wx:if="{{successMessage}}" class="customer-page__success">{{ui.message(successMessage)}}</text>
+  <view class="form-card">
+    <text class="section-title">联系资料</text><text class="description">用于租赁联系。地址与出生年份选填，与尺寸资料分别保存。</text>
+    <text class="form-card__label">姓名</text>
+    <input value="{{fullName}}" maxlength="100" placeholder="请输入姓名" disabled="{{saving || loading || !loaded}}" bindinput="onName" />
+    <text class="form-card__label">电子邮箱</text>
+    <input value="{{email}}" maxlength="255" placeholder="例如 name@example.com" disabled="{{saving || loading || !loaded}}" bindinput="onEmail" />
+    <text class="form-card__label">联系电话</text>
+    <input value="{{phone}}" maxlength="40" placeholder="含国家或地区代码" disabled="{{saving || loading || !loaded}}" bindinput="onPhone" />
+    <text class="form-card__label">联系地址（选填）</text>
+    <input value="{{address}}" maxlength="255" placeholder="填写联系地址" disabled="{{saving || loading || !loaded}}" bindinput="onAddress" />
+    <text class="form-card__label">出生年份（选填）</text>
+    <input value="{{birthYear}}" type="number" maxlength="4" placeholder="例如 1998" disabled="{{saving || loading || !loaded}}" bindinput="onBirthYear" />
+    <button class="form-actions" type="primary" loading="{{saving}}" disabled="{{saving || loading || !loaded}}" bindtap="saveContact">保存联系资料</button>
+  </view>
+  <view class="form-card">
+    <text class="section-title">身体与装备尺寸</text><text class="description">不确定时可以填写估算值，并开启对应标记。</text>
+    <text class="form-card__label">身高 / cm</text>
+    <input value="{{heightCm}}" type="digit" placeholder="例如 171.25" placeholder-class="input-placeholder" disabled="{{saving || loading}}" bindinput="onHeight" />
+    <view class="form-card__toggle"><text>这是估算的身高</text><switch color="#286a8e" checked="{{heightEstimated}}" disabled="{{saving || loading}}" bindchange="onHeightEstimated" /></view>
+    <text class="form-card__label">体重 / kg</text>
+    <input value="{{weightKg}}" type="digit" placeholder="例如 69.50" placeholder-class="input-placeholder" disabled="{{saving || loading}}" bindinput="onWeight" />
+    <view class="form-card__toggle"><text>这是估算的体重</text><switch color="#286a8e" checked="{{weightEstimated}}" disabled="{{saving || loading}}" bindchange="onWeightEstimated" /></view>
+    <text class="form-card__label">雪鞋尺码</text>
+    <input value="{{bootSize}}" type="digit" placeholder="例如 42.5" placeholder-class="input-placeholder" disabled="{{saving || loading}}" bindinput="onBootSize" />
+    <view class="form-card__toggle"><text>这是估算的鞋码</text><switch color="#286a8e" checked="{{bootSizeEstimated}}" disabled="{{saving || loading}}" bindchange="onBootSizeEstimated" /></view>
+    <button class="form-actions" type="primary" loading="{{saving}}" disabled="{{saving || loading || !loaded}}" bindtap="save">保存尺寸资料</button>
+  </view>
+  <view class="bottom-nav"><navigator class="nav-item" url="/pages/customerrequest/home"><text class="nav-icon">▤</text>租赁申请</navigator><navigator class="nav-item" url="/pages/rental/list"><text class="nav-icon">≡</text>我的租赁</navigator><view class="nav-item nav-item--active"><text class="nav-icon">↕</text>我的资料</view></view>
+</view>

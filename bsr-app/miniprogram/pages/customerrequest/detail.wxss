@@ -1,0 +1,5 @@
+.detail-card > .card-row { margin-bottom:20rpx; }
+.supplement-cycle { position:relative; margin-top:24rpx; padding:22rpx 24rpx; border-left:4rpx solid #92bfd5; border-radius:0 16rpx 16rpx 0; background:#f5f9fc; }
+.cycle-number { display:block; color:#638ba1; font-size:23rpx; font-weight:600; }
+.cycle-reason { display:block; margin-top:8rpx; color:#365b70; word-break:break-all; }
+.response-input { margin:24rpx 0; }

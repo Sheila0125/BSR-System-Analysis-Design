@@ -1,0 +1,2 @@
+.panel > .card-row { margin-bottom:20rpx; }
+.reject-button { margin-top:18rpx; }

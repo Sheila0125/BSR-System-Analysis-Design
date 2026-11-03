@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vitest/globals", "node"],
+    "lib": ["ES2020", "DOM"],
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "noEmit": true
+  },
+  "include": ["shared/**/*.ts", "tests/**/*.ts", "scripts/**/*.d.mts"],
+  "exclude": ["dist", "node_modules", "app.ts", "pages"]
+}
