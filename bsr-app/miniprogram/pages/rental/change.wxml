@@ -5,9 +5,18 @@
   <text wx:if="{{error}}" class="error">{{ui.message(error)}}</text><navigator wx:if="{{error}}" class="text-link" url="/pages/identity/login">重新登录 ›</navigator>
   <view wx:if="{{loading}}" class="loading-state">正在核对合同…</view>
   <view class="form-card"><text class="section-title">变更需求</text>
-    <text class="form-card__label">希望办理的门店编号</text><input value="{{storeId}}" type="number" bindinput="store" placeholder="请输入服务门店编号" placeholder-class="input-placeholder" disabled="{{submitting}}" />
+    <text class="form-card__label">希望办理的门店</text>
+    <picker range="{{stores}}" range-key="name" value="{{storeIndex}}" bindchange="store" disabled="{{submitting || !stores.length}}">
+      <view class="picker-value">{{stores[storeIndex].id === storeId ? stores[storeIndex].name : '原合同门店'}}<text class="picker-arrow">⌄</text></view>
+    </picker>
     <text class="form-card__label">变更类型</text><picker range="{{ui.labels(types)}}" value="{{typeIndex}}" bindchange="type" disabled="{{submitting}}"><view class="picker-value">{{ui.label(types[typeIndex])}}<text class="picker-arrow">⌄</text></view></picker>
-    <text class="form-card__label">具体需求</text><textarea value="{{note}}" bindinput="note" maxlength="500" placeholder="请说明需要变更或归还的装备，最多500字" placeholder-class="input-placeholder" disabled="{{submitting}}" />
+    <view wx:if="{{types[typeIndex] === 'ADD' || types[typeIndex] === 'REPLACE'}}">
+      <text class="form-card__label">希望增租或换入的装备</text>
+      <picker range="{{equipmentOptions}}" range-key="label" value="{{equipmentIndex}}" bindchange="equipment" disabled="{{submitting}}">
+        <view class="picker-value">{{equipmentCode ? equipmentOptions[equipmentIndex].label : '请选择装备类别'}}<text class="picker-arrow">⌄</text></view>
+      </picker>
+    </view>
+    <text class="form-card__label">其他需求 · 选填</text><textarea value="{{note}}" bindinput="note" maxlength="{{types[typeIndex] === 'ADD' || types[typeIndex] === 'REPLACE' ? 450 : 500}}" placeholder="例如数量、合身说明或交接需求" placeholder-class="input-placeholder" disabled="{{submitting}}" />
     <view wx:if="{{types[typeIndex] !== 'ADD'}}" class="return-intent">
       <text class="form-card__label">拟退回的原合同项目（选填）</text>
       <text class="description">仅记录意向，不代表已归还。请交由门店检查实物后办理。</text>

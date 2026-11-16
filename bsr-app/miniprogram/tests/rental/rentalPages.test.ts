@@ -9,12 +9,14 @@ type PageHarness = {
   confirmAdjustment(): Promise<void>;
   returned(event: { detail: { value: string[] } }): void;
   type(event: { detail: { value: string } }): void;
+  equipment(event: { detail: { value: string } }): void;
 };
 let page: PageHarness;
 // Pages are checked by the native tsconfig; load at runtime without mixing native and Node globals.
 async function loadPage(name: string) { await import(`../../pages/rental/${name}.ts`); }
 beforeEach(() => {
   vi.resetModules(); vi.resetAllMocks();
+  vi.stubGlobal('getApp', () => ({ globalData: { rentalStores: [{ id: '3', name: '演示门店' }] } }));
   vi.stubGlobal('Page', (options: PageHarness) => { page = { ...options, data: structuredClone(options.data), setData(patch) { Object.assign(this.data, patch); } }; });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -24,8 +26,10 @@ it('AC-WX03 pending duplicate intent is suppressed; expired Session clears old c
   api.submitChange.mockImplementation(() => new Promise((_resolve, failed) => { reject = failed; }));
   await loadPage('change');
   await page.onLoad({ id: '91' }); page.setData({ note: 'My change note', storeId: '4' });
+  page.equipment({ detail: { value: '2' } });
   const pending = page.submit(); await page.submit();
   expect(api.submitChange).toHaveBeenCalledTimes(1);
+  expect(api.submitChange).toHaveBeenCalledWith('91', expect.objectContaining({ note: '希望换入或新增：雪鞋（BOOTS）；My change note' }));
   reject({ status: 401, code: 'AUTHENTICATION_REQUIRED', detail: 'Log in again' }); await pending;
   expect(page.data['contract']).toBeNull();
   expect(page.data['note']).toBe('My change note'); expect(page.data['storeId']).toBe('4');

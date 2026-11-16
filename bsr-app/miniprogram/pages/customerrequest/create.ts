@@ -3,9 +3,11 @@ import {
   type RentalRequestInput,
 } from './customerRequestApi';
 import { customerRequestApiForConfiguredOrigin } from './configuredApi';
+import { configuredRentalStores, equipmentOptions, type RentalStoreOption } from '../../shared/rentalChoices';
 
 interface EditableItem {
   readonly equipmentCategory: string;
+  readonly categoryIndex?: number;
   readonly quantity: string;
   readonly fittingNote: string;
 }
@@ -13,6 +15,9 @@ interface EditableItem {
 Page({
   data: {
     serviceStoreId: '',
+    storeIndex: 0,
+    stores: [] as RentalStoreOption[],
+    equipmentOptions,
     rentalStartDate: '',
     rentalDays: '1',
     skillLevel: '',
@@ -26,8 +31,14 @@ Page({
     errorMessage: '',
   },
 
-  onStore(event: WechatMiniprogram.Input) {
-    this.setData({ serviceStoreId: event.detail.value });
+  onLoad() {
+    this.setData({ stores: configuredRentalStores() });
+  },
+
+  onStore(event: WechatMiniprogram.PickerChange) {
+    const storeIndex = Number(event.detail.value);
+    const store = this.data.stores[storeIndex];
+    if (store) this.setData({ storeIndex, serviceStoreId: store.id, errorMessage: '' });
   },
 
   onStartDate(event: WechatMiniprogram.Input) {
@@ -52,8 +63,10 @@ Page({
     if (code !== undefined) this.setData({ skillIndex: index, skillLevel: code });
   },
 
-  onCategory(event: WechatMiniprogram.Input) {
-    this.updateItem(event, { equipmentCategory: event.detail.value });
+  onCategory(event: WechatMiniprogram.PickerChange) {
+    const categoryIndex = Number(event.detail.value);
+    const option = this.data.equipmentOptions[categoryIndex];
+    if (option) this.updateItem(event, { equipmentCategory: option.code, categoryIndex });
   },
 
   onQuantity(event: WechatMiniprogram.Input) {
@@ -83,7 +96,7 @@ Page({
     }
   },
 
-  updateItem(event: WechatMiniprogram.Input, change: Partial<EditableItem>) {
+  updateItem(event: WechatMiniprogram.BaseEvent, change: Partial<EditableItem>) {
     const index = itemIndex(event);
     if (index !== undefined) {
       this.setData({
@@ -94,6 +107,15 @@ Page({
   },
 
   async submit() {
+    if (this.data.submitting) return;
+    if (!this.data.serviceStoreId) {
+      this.setData({ errorMessage: '请选择服务门店。' });
+      return;
+    }
+    if (this.data.items.some(item => !this.data.equipmentOptions.some(option => option.code === item.equipmentCategory))) {
+      this.setData({ errorMessage: '请为每一项选择装备类别，或移除不需要的项目。' });
+      return;
+    }
     const rentalDays = positiveInteger(this.data.rentalDays);
     const quantities = this.data.items.map((item) => positiveInteger(item.quantity));
     if (rentalDays === undefined || quantities.some((quantity) => quantity === undefined)) {

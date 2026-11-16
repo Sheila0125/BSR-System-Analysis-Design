@@ -6,6 +6,9 @@ interface FormPage {
   setData(patch: Record<string, unknown>): void;
   onSkillSelection(event: { detail: { value: string } }): void;
   onSkill(event: { detail: { value: string } }): void;
+  onLoad(): void;
+  onStore(event: { detail: { value: string } }): void;
+  onCategory(event: { detail: { value: string }; currentTarget: { dataset: { index: number } } }): void;
   submit(): Promise<void>;
 }
 let page: FormPage;
@@ -14,6 +17,7 @@ beforeEach(() => {
   vi.stubGlobal('Page', (options: FormPage) => {
     page = { ...options, data: structuredClone(options.data), setData(patch) { Object.assign(this.data, patch); } };
   });
+  vi.stubGlobal('getApp', () => ({ globalData: { rentalStores: [{ id: '3', name: '演示门店' }] } }));
   vi.stubGlobal('wx', { redirectTo: vi.fn() });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -37,4 +41,20 @@ it('retains manual skill entry for the existing free-text business field', async
   page.onSkill({ detail: { value: 'CUSTOM_LEVEL' } });
   await page.submit();
   expect(api.submitRequest).toHaveBeenCalledWith(expect.objectContaining({ skillLevel: 'CUSTOM_LEVEL' }));
+});
+
+it('submits the selected store and equipment codes and refuses blank equipment', async () => {
+  api.submitRequest.mockResolvedValue({ requestId: '9' });
+  await import(`../../pages/customerrequest/${'create'}.ts`);
+  page.onLoad();
+  page.onStore({ detail: { value: '0' } });
+  page.setData({ rentalStartDate: '2026-11-17' });
+  page.onSkillSelection({ detail: { value: '0' } });
+  await page.submit();
+  expect(api.submitRequest).not.toHaveBeenCalled();
+  page.onCategory({ detail: { value: '2' }, currentTarget: { dataset: { index: 0 } } });
+  await page.submit();
+  expect(api.submitRequest).toHaveBeenCalledWith(expect.objectContaining({
+    serviceStoreId: '3', items: [{ equipmentCategory: 'BOOTS', quantity: 1, fittingNote: null }],
+  }));
 });

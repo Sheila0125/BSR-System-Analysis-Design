@@ -19,6 +19,17 @@ if (demoIpOrigin && !/^https:\/\/(?:\d{1,3}\.){3}\d{1,3}(?::[1-9]\d{0,4})?\/?$/.
 // Validate before replacing an existing usable build. No default cloud address.
 const selectedOrigin = demoIpOrigin || configuredOrigin;
 const apiOrigin = selectedOrigin ? normalizeApiOrigin(selectedOrigin, demoIpOrigin) : undefined;
+const demoDirectory = JSON.parse(readFileSync(resolve(root, 'config/rental-stores.demo.json'), 'utf8'));
+const configuredStores = process.env.BSR_RENTAL_STORES?.trim();
+const rentalStores = configuredStores ? JSON.parse(configuredStores)
+  : demoIpOrigin && apiOrigin === demoDirectory.origin ? demoDirectory.stores : [];
+if (!Array.isArray(rentalStores) || rentalStores.some(store =>
+  typeof store?.id !== 'string' || !/^[1-9][0-9]{0,18}$/.test(store.id)
+  || typeof store?.name !== 'string' || !store.name.trim() || store.name.length > 120)
+  || new Set(rentalStores.map(store => store.id)).size !== rentalStores.length) {
+  throw new Error('BSR_RENTAL_STORES must be an array of distinct { id, name } store options.');
+}
+const storeOptions = rentalStores.map(({ id, name }) => ({ id, name }));
 
 validatePageFiles(root, manifest.pages);
 rmSync(output, { recursive: true, force: true });
@@ -37,7 +48,10 @@ if (compiler.status !== 0) {
 
 const applicationFile = resolve(output, 'app.js');
 writeFileSync(applicationFile,
-  `const BSR_API_ORIGIN = ${JSON.stringify(apiOrigin) ?? 'undefined'};\n${readFileSync(applicationFile, 'utf8')}`);
+  `const BSR_API_ORIGIN = ${JSON.stringify(apiOrigin) ?? 'undefined'};\n` +
+  `const BSR_CLASSROOM_BUILD = ${Boolean(demoIpOrigin)};\n` +
+  `const BSR_RENTAL_STORES = ${JSON.stringify(storeOptions)};\n` +
+  readFileSync(applicationFile, 'utf8'));
 
 const originValidatorFile = resolve(output, 'shared/network/apiOrigin.js');
 writeFileSync(originValidatorFile,

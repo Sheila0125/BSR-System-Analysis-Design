@@ -7,6 +7,7 @@ interface ProfilePage {
   onLoad(): Promise<void>;
   saveContact(): Promise<void>;
   save(): Promise<void>;
+  onBootSize(event: { detail: { value: string } }): void;
 }
 let page: ProfilePage;
 const profile = {
@@ -55,4 +56,15 @@ it('retains failed contact input, blocks duplicate submission and disables saves
   await page.save();
   expect(api.updateContactDetails).toHaveBeenCalledTimes(1);
   expect(api.updateMeasurements).not.toHaveBeenCalled();
+});
+
+it('keeps a recorded nonstandard size in the picker and can select a half size', async () => {
+  api.loadProfile.mockResolvedValue({ ...profile, bootSize: '42.7' });
+  api.updateMeasurements.mockResolvedValue({ ...profile, bootSize: '42.5' });
+  await load();
+  const sizes = page.data['bootSizes'] as string[];
+  expect(sizes).toContain('42.7');
+  page.onBootSize({ detail: { value: String(sizes.indexOf('42.5')) } });
+  await page.save();
+  expect(api.updateMeasurements).toHaveBeenCalledWith(expect.objectContaining({ bootSize: '42.5' }));
 });

@@ -1,5 +1,18 @@
 import { customerRequestApiForConfiguredOrigin } from './configuredApi';
 
+const standardBootSizes = Array.from({ length: 41 }, (_, index) => String(32 + index / 2));
+
+function bootSizeSelection(value: string | null) {
+  const bootSize = value === null ? '' : String(Number(value));
+  const sizes = [...standardBootSizes];
+  if (bootSize && !sizes.includes(bootSize)) {
+    sizes.push(bootSize);
+    sizes.sort((left, right) => Number(left) - Number(right));
+  }
+  const bootSizes = ['暂不填写', ...sizes];
+  return { bootSize, bootSizes, bootSizeIndex: bootSize ? bootSizes.indexOf(bootSize) : 0 };
+}
+
 Page({
   data: {
     fullName: '',
@@ -10,7 +23,7 @@ Page({
     birthYear: '',
     heightCm: '',
     weightKg: '',
-    bootSize: '',
+    ...bootSizeSelection(null),
     heightEstimated: false,
     weightEstimated: false,
     bootSizeEstimated: false,
@@ -23,7 +36,7 @@ Page({
 
   async onLoad() {
     this.setData({
-      fullName: '', customerNumber: '', heightCm: '', weightKg: '', bootSize: '',
+      fullName: '', customerNumber: '', heightCm: '', weightKg: '', ...bootSizeSelection(null),
       email: '', phone: '', address: '', birthYear: '', loaded: false,
       heightEstimated: false, weightEstimated: false, bootSizeEstimated: false,
       loading: true, errorMessage: '', successMessage: '',
@@ -40,7 +53,7 @@ Page({
         loaded: true,
         heightCm: profile.heightCm ?? '',
         weightKg: profile.weightKg ?? '',
-        bootSize: profile.bootSize ?? '',
+        ...bootSizeSelection(profile.bootSize),
         heightEstimated: profile.heightEstimated,
         weightEstimated: profile.weightEstimated,
         bootSizeEstimated: profile.bootSizeEstimated,
@@ -86,8 +99,12 @@ Page({
     this.setData({ weightKg: event.detail.value });
   },
 
-  onBootSize(event: WechatMiniprogram.Input) {
-    this.setData({ bootSize: event.detail.value });
+  onBootSize(event: WechatMiniprogram.PickerChange) {
+    const bootSizeIndex = Number(event.detail.value);
+    const selection = this.data.bootSizes[bootSizeIndex];
+    if (selection === undefined) return;
+    const bootSize = bootSizeIndex === 0 ? '' : selection;
+    this.setData({ bootSize, bootSizeIndex, ...(bootSize ? {} : { bootSizeEstimated: false }) });
   },
 
   onHeightEstimated(event: WechatMiniprogram.SwitchChange) {
@@ -117,7 +134,7 @@ Page({
       this.setData({
         heightCm: profile.heightCm ?? '',
         weightKg: profile.weightKg ?? '',
-        bootSize: profile.bootSize ?? '',
+        ...bootSizeSelection(profile.bootSize),
         successMessage: 'Measurements saved.',
       });
     } catch (error) {

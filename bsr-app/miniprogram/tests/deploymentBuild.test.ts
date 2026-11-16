@@ -15,9 +15,12 @@ function build(origin = '', demoOrigin = '') {
 }
 function readApp() {
   const source = readFileSync(resolve(root, 'dist/app.js'), 'utf8');
-  let app: { globalData?: { apiOrigin?: string } } | undefined;
-  runInNewContext(source, { App: (value: typeof app) => { app = value; } });
-  return app;
+  let app: { globalData?: { apiOrigin?: string; rentalStores?: Array<{ id: string; name: string }> }; onLaunch(): void } | undefined;
+  const dialogs: Array<{ title: string; content: string }> = [];
+  runInNewContext(source, { App: (value: typeof app) => { app = value; },
+    wx: { showModal: (dialog: typeof dialogs[number]) => { dialogs.push(dialog); } } });
+  app?.onLaunch();
+  return { ...app, dialogs };
 }
 
 afterAll(() => { expect(build().status).toBe(0); }, 30_000);
@@ -39,12 +42,17 @@ it('rejects invalid deployment origins before replacing the existing compiled ou
 it('keeps unconfigured local preview free of a fabricated cloud address', () => {
   expect(build().status).toBe(0);
   expect(readApp()?.globalData?.apiOrigin).toBeUndefined();
+  expect(readApp().dialogs).toHaveLength(0);
 }, 30_000);
 
 it('builds an explicit IP demo whose actual runtime accepts only that IP', () => {
   const demo = 'https://49.233.93.180';
   expect(build('', demo).status).toBe(0);
-  expect(readApp()?.globalData?.apiOrigin).toBe(demo);
+  const app = readApp();
+  expect(app.globalData?.apiOrigin).toBe(demo);
+  expect(app.globalData?.rentalStores?.map(store => store.id)).toEqual(['1', '2', '3', '4', '5']);
+  expect(app.dialogs).toHaveLength(1);
+  expect(app.dialogs[0]?.content).toContain('域名仍在提交审核阶段');
   const runtimeExports: { normalizeApiOrigin?: (origin: string) => string } = {};
   runInNewContext(readFileSync(resolve(root, 'dist/shared/network/apiOrigin.js'), 'utf8'),
     { exports: runtimeExports });
