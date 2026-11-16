@@ -21,6 +21,18 @@
         <view class="picker-value">{{item.equipmentCategory ? equipmentOptions[item.categoryIndex].label : '请选择装备类别'}}<text class="picker-arrow">⌄</text></view>
       </picker>
       <text class="form-card__label">数量</text><input value="{{item.quantity}}" type="number" data-index="{{itemIndex}}" bindinput="onQuantity" disabled="{{submitting}}" />
+      <view wx:if="{{item.equipmentCategory === 'SKI' || item.equipmentCategory === 'SNOWBOARD'}}" class="notice">
+        <text wx:if="{{item.equipmentCategory === 'SKI'}}">
+          双板板长参考：{{skiLength || (heightCm ? '请选滑雪水平，或请门店核对板长' : '可先在我的资料填写身高')}}
+          <text wx:if="{{skiLength && heightEstimated}}">（身高为估算值）</text>
+          <text wx:if="{{skiLength}}" class="caption">按身高和水平参考 K2 尺码表，取板时由门店结合体重和型号核对。</text>
+        </text>
+        <text wx:else>
+          单板板长参考：{{snowboardLength || (weightKg ? '请门店核对板长' : '可先在我的资料填写体重')}}
+          <text wx:if="{{snowboardLength && weightEstimated}}">（体重为估算值）</text>
+          <text wx:if="{{snowboardLength}}" class="caption">按体重参考 Jones 成人尺码表，取板时由门店结合型号和雪鞋核对。</text>
+        </text>
+      </view>
       <text class="form-card__label">合身说明 · 选填</text><textarea value="{{item.fittingNote}}" maxlength="255" placeholder="例如偏好的长度、穿戴习惯等" placeholder-class="input-placeholder" data-index="{{itemIndex}}" bindinput="onFittingNote" disabled="{{submitting}}" />
     </view>
     <button wx:if="{{items.length < 20}}" class="button-secondary" bindtap="addItem" disabled="{{submitting}}">＋ 添加一种装备</button>

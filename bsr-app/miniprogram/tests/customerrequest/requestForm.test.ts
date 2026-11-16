@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const api = vi.hoisted(() => ({ submitRequest: vi.fn() }));
+const api = vi.hoisted(() => ({ submitRequest: vi.fn(), loadProfile: vi.fn() }));
 vi.mock('../../pages/customerrequest/configuredApi', () => ({ customerRequestApiForConfiguredOrigin: () => api }));
 interface FormPage {
   data: Record<string, unknown>;
   setData(patch: Record<string, unknown>): void;
   onSkillSelection(event: { detail: { value: string } }): void;
   onSkill(event: { detail: { value: string } }): void;
-  onLoad(): void;
+  onLoad(): Promise<void>;
   onStore(event: { detail: { value: string } }): void;
   onCategory(event: { detail: { value: string }; currentTarget: { dataset: { index: number } } }): void;
   submit(): Promise<void>;
@@ -14,6 +14,7 @@ interface FormPage {
 let page: FormPage;
 beforeEach(() => {
   vi.resetModules(); vi.resetAllMocks();
+  api.loadProfile.mockResolvedValue({ heightCm: '173', weightKg: '68', heightEstimated: false, weightEstimated: true });
   vi.stubGlobal('Page', (options: FormPage) => {
     page = { ...options, data: structuredClone(options.data), setData(patch) { Object.assign(this.data, patch); } };
   });
@@ -46,10 +47,12 @@ it('retains manual skill entry for the existing free-text business field', async
 it('submits the selected store and equipment codes and refuses blank equipment', async () => {
   api.submitRequest.mockResolvedValue({ requestId: '9' });
   await import(`../../pages/customerrequest/${'create'}.ts`);
-  page.onLoad();
+  await page.onLoad();
   page.onStore({ detail: { value: '0' } });
   page.setData({ rentalStartDate: '2026-11-17' });
   page.onSkillSelection({ detail: { value: '0' } });
+  expect(page.data['skiLength']).toBe('158–168 cm');
+  expect(page.data['snowboardLength']).toBe('150–153 cm');
   await page.submit();
   expect(api.submitRequest).not.toHaveBeenCalled();
   page.onCategory({ detail: { value: '2' }, currentTarget: { dataset: { index: 0 } } });

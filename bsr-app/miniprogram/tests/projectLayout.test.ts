@@ -29,6 +29,24 @@ describe('mini program project layout', () => {
     expect(() => validatePageFiles(root, manifest.pages)).not.toThrow();
   });
 
+  it('switches between all three customer hubs without growing the page stack', () => {
+    const hubs = ['pages/customerrequest/home', 'pages/rental/list', 'pages/customerrequest/profile'];
+    for (const hub of hubs) {
+      const markup = readFileSync(resolve(root, hub + '.wxml'), 'utf8');
+      const bottom = markup.split('class="bottom-nav">')[1];
+      expect(bottom).toBeDefined();
+      const links = [...(bottom ?? '').matchAll(/<navigator\b[^>]*\burl="([^"]+)"[^>]*>/g)];
+      expect(links.map(link => link[1]).sort()).toEqual(hubs.filter(peer => peer !== hub).map(peer => '/' + peer).sort());
+      for (const peer of hubs) {
+        const target = '/' + peer;
+        const hubLinks = [...markup.matchAll(/<navigator\b[^>]*\burl="([^"]+)"[^>]*>/g)];
+        for (const link of hubLinks.filter(link => link[1] === target)) {
+          expect(link[0], hub + ' → ' + target).toContain('open-type="reLaunch"');
+        }
+      }
+    }
+  });
+
   it('reports every missing companion file instead of silently building', () => {
     const missing = missingPageFiles(
       root,

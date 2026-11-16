@@ -20,10 +20,6 @@ Page({
     }
   },
 
-  openProfile() {
-    wx.navigateTo({ url: '/pages/customerrequest/profile' });
-  },
-
   openCreate() {
     wx.navigateTo({ url: '/pages/customerrequest/create' });
   },

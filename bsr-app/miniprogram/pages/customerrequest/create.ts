@@ -4,6 +4,7 @@ import {
 } from './customerRequestApi';
 import { customerRequestApiForConfiguredOrigin } from './configuredApi';
 import { configuredRentalStores, equipmentOptions, type RentalStoreOption } from '../../shared/rentalChoices';
+import { skiLengthReference, snowboardLengthReference } from '../../shared/boardLength';
 
 interface EditableItem {
   readonly equipmentCategory: string;
@@ -21,6 +22,12 @@ Page({
     rentalStartDate: '',
     rentalDays: '1',
     skillLevel: '',
+    heightCm: null as string | null,
+    weightKg: null as string | null,
+    heightEstimated: false,
+    weightEstimated: false,
+    skiLength: '',
+    snowboardLength: '',
     skillIndex: 0,
     skillLevels: ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'],
     skillLabels: ['初级', '中级', '高级', '其他水平（手动填写）'],
@@ -31,8 +38,21 @@ Page({
     errorMessage: '',
   },
 
-  onLoad() {
+  async onLoad() {
     this.setData({ stores: configuredRentalStores() });
+    try {
+      const profile = await customerRequestApiForConfiguredOrigin().loadProfile();
+      this.setData({
+        heightCm: profile.heightCm,
+        weightKg: profile.weightKg,
+        heightEstimated: profile.heightEstimated,
+        weightEstimated: profile.weightEstimated,
+        skiLength: skiLengthReference(profile.heightCm, this.data.skillLevel),
+        snowboardLength: snowboardLengthReference(profile.weightKg),
+      });
+    } catch {
+      // The optional guide must not block submitting a request.
+    }
   },
 
   onStore(event: WechatMiniprogram.PickerChange) {
@@ -50,17 +70,20 @@ Page({
   },
 
   onSkill(event: WechatMiniprogram.Input) {
-    this.setData({ skillLevel: event.detail.value });
+    const skillLevel = event.detail.value;
+    this.setData({ skillLevel, skiLength: skiLengthReference(this.data.heightCm, skillLevel.trim().toUpperCase()) });
   },
 
   onSkillSelection(event: WechatMiniprogram.PickerChange) {
     const index = Number(event.detail.value);
     if (index === 3) {
-      this.setData({ skillIndex: index, skillLevel: '' });
+      this.setData({ skillIndex: index, skillLevel: '', skiLength: '' });
       return;
     }
     const code = this.data.skillLevels[index];
-    if (code !== undefined) this.setData({ skillIndex: index, skillLevel: code });
+    if (code !== undefined) {
+      this.setData({ skillIndex: index, skillLevel: code, skiLength: skiLengthReference(this.data.heightCm, code) });
+    }
   },
 
   onCategory(event: WechatMiniprogram.PickerChange) {

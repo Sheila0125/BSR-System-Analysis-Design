@@ -33,5 +33,5 @@
     <view class="form-card__toggle"><text>这是估算的鞋码</text><switch color="#286a8e" checked="{{bootSizeEstimated}}" disabled="{{saving || loading || !bootSize}}" bindchange="onBootSizeEstimated" /></view>
     <button class="form-actions" type="primary" loading="{{saving}}" disabled="{{saving || loading || !loaded}}" bindtap="save">保存尺寸资料</button>
   </view>
-  <view class="bottom-nav"><navigator class="nav-item" url="/pages/customerrequest/home"><text class="nav-icon">▤</text>租赁申请</navigator><navigator class="nav-item" url="/pages/rental/list"><text class="nav-icon">≡</text>我的租赁</navigator><view class="nav-item nav-item--active"><text class="nav-icon">↕</text>我的资料</view></view>
+  <view class="bottom-nav"><navigator class="nav-item" url="/pages/customerrequest/home" open-type="reLaunch"><text class="nav-icon">▤</text>租赁申请</navigator><navigator class="nav-item" url="/pages/rental/list" open-type="reLaunch"><text class="nav-icon">≡</text>我的租赁</navigator><view class="nav-item nav-item--active"><text class="nav-icon">↕</text>我的资料</view></view>
 </view>
