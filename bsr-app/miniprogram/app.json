@@ -11,6 +11,7 @@
     "pages/rental/change",
     "pages/rental/invoice"
   ],
+  "lazyCodeLoading": "requiredComponents",
   "window": {
     "navigationBarTitleText": "BSR 雪具租赁",
     "navigationBarBackgroundColor": "#f1f6fa",

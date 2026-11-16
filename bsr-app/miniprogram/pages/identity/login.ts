@@ -29,10 +29,14 @@ Page({
       this.setData({ password: '' });
       wx.reLaunch({ url: '/pages/customerrequest/home' });
     } catch (error) {
-      const problem = error as Partial<MiniApiProblem>;
+      const problem = error as (Partial<MiniApiProblem> & { errMsg?: string }) | undefined;
+      const domainRejected = typeof problem?.errMsg === 'string'
+        && /not in domain list|合法域名/i.test(problem.errMsg);
       this.setData({
         password: '',
-        errorMessage: problem.detail ?? 'Sign-in failed. Check the connection and try again.',
+        errorMessage: domainRejected
+          ? 'WeChat rejected the BSR request domain.'
+          : (problem?.detail ?? 'Sign-in failed. Check the connection and try again.'),
       });
     } finally {
       this.setData({ submitting: false });

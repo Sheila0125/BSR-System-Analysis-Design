@@ -19,6 +19,8 @@ var messages = {
   'The secure BSR API origin is not configured.': '服务连接尚未配置，请联系管理员。',
   'The BSR API origin is not configured.': '服务连接尚未配置，请联系管理员。',
   'The mini program API origin is not configured.': '服务连接尚未配置，请联系管理员。',
+  'Use a customer account in the mini program.': '小程序仅支持顾客账号。员工、管理人员和维修承包商请使用网页后台。',
+  'WeChat rejected the BSR request domain.': '微信未允许连接 BSR 服务，请联系管理员检查小程序的请求域名。',
   'Sign-in failed. Check the connection and try again.': '登录失败，请检查连接后重试。',
   'Could not load your rental requests.': '暂时无法加载申请，请稍后重试。',
   'Could not load your profile.': '暂时无法加载尺寸资料，请稍后重试。',

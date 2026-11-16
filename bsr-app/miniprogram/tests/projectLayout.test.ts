@@ -6,6 +6,7 @@ import { missingPageFiles, validatePageFiles } from '../scripts/project-layout.m
 const root = resolve(import.meta.dirname, '..');
 const manifest = JSON.parse(readFileSync(resolve(root, 'app.json'), 'utf8')) as {
   pages: string[];
+  lazyCodeLoading?: string;
 };
 
 const expectedPages = [
@@ -44,5 +45,16 @@ describe('mini program project layout', () => {
     if (project.appid !== undefined) {
       expect(project.appid).toMatch(/^wx[0-9a-f]{16}$/);
     }
+  });
+
+  it('enables the upload optimizations required by the WeChat quality scan', () => {
+    const project = JSON.parse(readFileSync(resolve(root, 'project.config.json'), 'utf8')) as {
+      setting?: {
+        minified?: boolean;
+      };
+    };
+
+    expect(project.setting?.minified).toBe(true);
+    expect(manifest.lazyCodeLoading).toBe('requiredComponents');
   });
 });
