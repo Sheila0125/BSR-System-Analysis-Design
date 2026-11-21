@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { currentActor, type CurrentActor } from '../identity/authApi'
+import { computed, inject, onMounted, reactive, ref, watch } from 'vue'
+import { sessionActorKey } from '../identity/sessionStores'
+import StoreSelect from '../identity/StoreSelect.vue'
+import { equipmentSkillLevels } from './equipmentChoices'
 import { errorText, uiText } from '../../shared/presentation/zh'
 import { loadCatalog, loadPricing, saveArchive, type EquipmentArchive } from './equipmentCatalogApi'
 
-const actor = ref<CurrentActor | null>(null)
+const actor = inject(sessionActorKey, null)
 const storeId = ref('')
 const status = ref('')
 const inventory = ref('')
@@ -21,13 +23,10 @@ const archiveStore = ref('')
 const form = reactive({ inventoryNumber: '', equipmentName: '', equipmentCategory: 'SKI', skillLevel: 'BEGINNER',
   description: '', purchaseDate: '', purchasePrice: '', retailPrice: '', currentDailyRate: '' })
 const states = ['AVAILABLE', 'PENDING_ISSUE', 'RENTED', 'RETURN_INSPECTION', 'WAITING_REPAIR', 'IN_REPAIR', 'PENDING_ACCEPTANCE', 'IN_TRANSFER', 'PENDING_REVIEW']
-const stores = computed(() => [...new Set(actor.value?.grants.filter(g => ['MANAGER', 'EMPLOYEE'].includes(g.role) && g.storeId).map(g => g.storeId as string) ?? [])])
-const canEdit = computed(() => actor.value?.grants.some(g => g.role === 'MANAGER' && g.storeId === storeId.value) ?? false)
+const canEdit = computed(() => actor?.value?.grants.some(g => g.role === 'MANAGER' && g.storeId === storeId.value) ?? false)
 watch(storeId, () => { rows.value = []; loaded.value = false; editing.value = false; error.value = ''; notice.value = '' })
 onMounted(async () => {
   try {
-    actor.value = await currentActor()
-    storeId.value = stores.value[0] ?? ''
     rates.value = (await loadPricing()).dailyRates
   } catch (failure) { error.value = errorText(failure) }
 })
@@ -94,15 +93,12 @@ async function save() {
       data-testid="catalog-search"
       @submit.prevent="search"
     >
-      <label>授权门店<select
+      <StoreSelect
         v-model="storeId"
+        label="授权门店"
+        role="EITHER"
         :disabled="busy"
-        required
-      ><option value="">请选择</option><option
-        v-for="id in stores"
-        :key="id"
-        :value="id"
-      >门店 {{ id }}</option></select></label>
+      />
       <label>装备状态<select
         v-model="status"
         aria-label="装备状态"
@@ -179,12 +175,20 @@ async function save() {
           v-for="key in ['SKI','SNOWBOARD','BOOTS','POLES','GOGGLES','HELMET']"
           :key="key"
           :value="key"
-        >{{ uiText(key) }}</option></select></label><label>技术等级<input
-          v-model.trim="form.skillLevel"
-          maxlength="20"
-          :disabled="busy"
+        >{{ uiText(key) }}</option></select></label><label>技术等级<select
+          v-model="form.skillLevel"
           required
-        ></label>
+        >
+          <option
+            v-if="!equipmentSkillLevels.includes(form.skillLevel)"
+            :value="form.skillLevel"
+          >{{ form.skillLevel }}</option>
+          <option
+            v-for="value in equipmentSkillLevels"
+            :key="value"
+            :value="value"
+          >{{ uiText(value) }}</option>
+        </select></label>
         <label>购入日期<input
           v-model="form.purchaseDate"
           type="date"

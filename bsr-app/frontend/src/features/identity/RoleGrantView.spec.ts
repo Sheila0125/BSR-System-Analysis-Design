@@ -1,3 +1,4 @@
+import { sessionOptions } from '../../../tests/unit/sessionOptions'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import RoleGrantView from './RoleGrantView.vue'
@@ -17,13 +18,12 @@ describe('AC-BR02 RoleGrantView', () => {
       roleGrantId: '71', accountId: '22', role: 'MANAGER', storeId: '3',
       validFrom: '2026-09-29T08:00:00', validTo: null,
     })
-    const wrapper = mount(RoleGrantView)
+    const wrapper = mount(RoleGrantView, sessionOptions(['3', '17']))
     const form = wrapper.find('.grant-form')
     const account = form.find('input[inputmode="numeric"]')
     await account.setValue('22')
     await form.find('select').setValue('MANAGER')
-    const identifiers = form.findAll('input[inputmode="numeric"]')
-    await identifiers[1]?.setValue('3')
+    await form.get('select[aria-label="门店编号"]').setValue('3')
     const dates = form.findAll('input[type="datetime-local"]')
     await dates[0]?.setValue('2026-09-29T08:00')
     await form.trigger('submit')
@@ -38,7 +38,7 @@ describe('AC-BR02 RoleGrantView', () => {
   })
 
   it('rejects a missing scoped store before sending a request', async () => {
-    const wrapper = mount(RoleGrantView)
+    const wrapper = mount(RoleGrantView, sessionOptions(['3', '17']))
     const form = wrapper.find('.grant-form')
     await form.find('input[inputmode="numeric"]').setValue('22')
     await form.find('input[type="datetime-local"]').setValue('2026-09-29T08:00')

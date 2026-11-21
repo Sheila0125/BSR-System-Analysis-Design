@@ -1,3 +1,4 @@
+import { sessionOptions } from '../../../tests/unit/sessionOptions'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, expect, it, vi } from 'vitest'
 import EquipmentCatalogView from './EquipmentCatalogView.vue'
@@ -11,11 +12,10 @@ it('queries non-available archives and lets only managers edit prices without li
   const calls: { url: string; body?: string }[] = []
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     calls.push({ url, body: init?.body as string | undefined })
-    if (url === '/api/auth/me') return { ok: true, json: async () => ({ identityType: 'EMPLOYEE', grants: [{ role: 'MANAGER', storeId: '1' }] }) }
     if (url === '/api/pricing') return { ok: true, json: async () => ({ currency: 'NOK', dailyRates: { SKI: '350.00' } }) }
     return { ok: true, json: async () => [{ equipmentId: '7', inventoryNumber: 'SK-7', equipmentName: '测试双板', equipmentCategory: 'SKI', skillLevel: 'BEGINNER', status: 'WAITING_REPAIR', currentDailyRate: '99.50', currentStoreId: '1', homeStoreId: '1', revision: '0' }] }
   }))
-  const wrapper = mount(EquipmentCatalogView)
+  const wrapper = mount(EquipmentCatalogView, sessionOptions(['1']))
   await flushPromises()
   await wrapper.get('[aria-label="装备状态"]').setValue('WAITING_REPAIR')
   await wrapper.get('[data-testid="catalog-search"]').trigger('submit')
@@ -32,7 +32,7 @@ it('does not offer archive writes to an employee', async () => {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, json: async () => url === '/api/auth/me'
     ? { identityType: 'EMPLOYEE', grants: [{ role: 'EMPLOYEE', storeId: '1' }] }
     : url === '/api/pricing' ? { currency: 'NOK', dailyRates: {} } : [] })))
-  const wrapper = mount(EquipmentCatalogView)
+  const wrapper = mount(EquipmentCatalogView, sessionOptions(['1'], ['EMPLOYEE']))
   await flushPromises()
   expect(wrapper.find('[data-testid="new-archive"]').exists()).toBe(false)
 })

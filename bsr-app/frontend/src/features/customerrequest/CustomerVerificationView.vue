@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StoreSelect from '../identity/StoreSelect.vue'
 import { problemText } from '../../shared/presentation/zh'
 import { ref } from 'vue'
 import { ApiError } from '../../shared/http/apiClient'
@@ -87,11 +88,12 @@ async function saveReview() {
       class="verification-form"
       @submit.prevent="search"
     >
-      <label>门店编号<input
-        v-model.trim="storeId"
-        inputmode="numeric"
-        required
-      ></label>
+      <StoreSelect
+        v-model="storeId"
+        label="门店编号"
+        role="EMPLOYEE"
+        :disabled="loading"
+      />
       <label>查询方式<select v-model="field">
         <option value="customerNumber">顾客编号</option>
         <option value="email">电子邮箱</option>

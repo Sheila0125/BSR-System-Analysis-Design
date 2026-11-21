@@ -1,3 +1,4 @@
+import { sessionOptions } from '../../../tests/unit/sessionOptions'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, expect, it, vi } from 'vitest'
 import ShiftManagementView from './ShiftManagementView.vue'
@@ -8,16 +9,19 @@ vi.mock('./employeeContactApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./employeeContactApi')>()
   return { ...actual, employeeChoices: (storeId: string) => api.employeeChoices(storeId) }
 })
-beforeEach(() => { vi.clearAllMocks(); api.storeShifts.mockResolvedValue([]); api.employeeChoices.mockResolvedValue([]) })
+beforeEach(() => { vi.clearAllMocks(); api.storeShifts.mockResolvedValue([]); api.employeeChoices.mockResolvedValue([
+  { employeeId: '21', employeeNumber: 'E-21', fullName: 'Course employee' },
+  { employeeId: '22', employeeNumber: 'E-22', fullName: 'Second employee' },
+]) })
 
 it('loads current store employee hints with the shift queue without bypassing the final conflict check', async () => {
   api.employeeChoices.mockResolvedValue([{ employeeId: '21', employeeNumber: 'E-21', fullName: 'Course employee' }])
-  const wrapper = mount(ShiftManagementView)
+  const wrapper = mount(ShiftManagementView, sessionOptions(['11', '12']))
   await wrapper.get('[aria-label="门店编号"]').setValue('11')
   await wrapper.get('[data-testid="load-shifts"]').trigger('click')
   await flushPromises()
   expect(api.employeeChoices).toHaveBeenCalledWith('11')
-  expect(wrapper.get('datalist option[value="21"]').text()).toContain('Course employee')
+  expect(wrapper.get('select[aria-label="员工"] option[value="21"]').text()).toContain('Course employee')
 })
 
 it('maintains the scoped employee address and note independently from a shift and retains failed input', async () => {
@@ -27,9 +31,10 @@ it('maintains the scoped employee address and note independently from a shift an
     .mockRejectedValueOnce(new Error('Offline'))
   vi.stubGlobal('fetch', fetchMock)
   try {
-    const wrapper = mount(ShiftManagementView)
+    const wrapper = mount(ShiftManagementView, sessionOptions(['11', '12']))
     await wrapper.get('[aria-label="门店编号"]').setValue('11')
-    await wrapper.get('[aria-label="员工编号"]').setValue('21')
+    await flushPromises()
+  await wrapper.get('[aria-label="员工"]').setValue('21')
     await wrapper.get('[data-testid="load-employee-contact"]').trigger('click')
     await flushPromises()
     expect((wrapper.get('[aria-label="员工地址"]').element as HTMLInputElement).value).toBe('Old address')
@@ -42,7 +47,7 @@ it('maintains the scoped employee address and note independently from a shift an
     expect((wrapper.get('[aria-label="员工地址"]').element as HTMLInputElement).value).toBe('New address')
     expect(wrapper.get('[role="alert"]').text()).toContain('Offline')
     expect(api.create).not.toHaveBeenCalled()
-    await wrapper.get('[aria-label="员工编号"]').setValue('22')
+    await wrapper.get('[aria-label="员工"]').setValue('22')
     expect(wrapper.find('[data-testid="save-employee-contact"]').exists()).toBe(false)
   } finally { vi.unstubAllGlobals() }
 })
@@ -51,9 +56,10 @@ it('AC-UC12 manager creates and adjusts a shift with one date, store, employee a
   const created = { shiftId: '7', shiftNumber: 'SH-7', shiftDate: '2030-10-20', storeId: '11', employeeId: '21', startTime: '08:00', endTime: '16:00', status: 'ACTIVE' }
   api.create.mockResolvedValue(created)
   api.adjust.mockResolvedValue({ ...created, endTime: '18:00' })
-  const wrapper = mount(ShiftManagementView)
+  const wrapper = mount(ShiftManagementView, sessionOptions(['11', '12']))
   await wrapper.get('[aria-label="门店编号"]').setValue('11')
-  await wrapper.get('[aria-label="员工编号"]').setValue('21')
+  await flushPromises()
+  await wrapper.get('[aria-label="员工"]').setValue('21')
   await wrapper.get('[aria-label="排班日期"]').setValue('2030-10-20')
   await wrapper.get('[aria-label="开始时间"]').setValue('08:00')
   await wrapper.get('[aria-label="结束时间"]').setValue('16:00')
@@ -72,18 +78,19 @@ it('AC-BR35/AC-BR37 keeps manager input on conflict and requires cancellation re
   api.storeShifts.mockResolvedValue([shift])
   api.create.mockRejectedValue(new Error('Employee already has a shift.'))
   api.cancel.mockResolvedValue({ ...shift, status: 'CANCELLED', cancellationReason: 'Unavailable' })
-  const wrapper = mount(ShiftManagementView)
+  const wrapper = mount(ShiftManagementView, sessionOptions(['11', '12']))
   await wrapper.get('[aria-label="门店编号"]').setValue('11')
   await wrapper.get('[data-testid="load-shifts"]').trigger('click')
   await flushPromises()
-  await wrapper.get('[aria-label="员工编号"]').setValue('21')
+  await flushPromises()
+  await wrapper.get('[aria-label="员工"]').setValue('21')
   await wrapper.get('[aria-label="排班日期"]').setValue('2030-10-20')
   await wrapper.get('[aria-label="开始时间"]').setValue('08:00')
   await wrapper.get('[aria-label="结束时间"]').setValue('16:00')
   await wrapper.get('[data-testid="save-shift"]').trigger('click')
   await flushPromises()
   expect(wrapper.get('[role="alert"]').text()).toContain('Employee already has a shift.')
-  expect((wrapper.get('[aria-label="员工编号"]').element as HTMLInputElement).value).toBe('21')
+  expect((wrapper.get('[aria-label="员工"]').element as HTMLSelectElement).value).toBe('21')
   expect(wrapper.get('[data-testid="cancel-7"]').attributes('disabled')).toBeDefined()
   await wrapper.get('[aria-label="取消原因：7"]').setValue('Unavailable')
   await wrapper.get('[data-testid="cancel-7"]').trigger('click')
@@ -95,7 +102,7 @@ it('AC-UC12 moving a shift to another store removes it from the loaded source-st
   const source = { shiftId: '7', shiftNumber: 'SH-7', shiftDate: '2030-10-20', storeId: '11', employeeId: '21', startTime: '08:00', endTime: '16:00', status: 'ACTIVE' }
   api.storeShifts.mockResolvedValue([source])
   api.adjust.mockResolvedValue({ ...source, storeId: '12' })
-  const wrapper = mount(ShiftManagementView)
+  const wrapper = mount(ShiftManagementView, sessionOptions(['11', '12']))
   await wrapper.get('[aria-label="门店编号"]').setValue('11')
   await wrapper.get('[data-testid="load-shifts"]').trigger('click')
   await flushPromises()

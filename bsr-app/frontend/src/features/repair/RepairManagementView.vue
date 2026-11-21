@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StoreSelect from '../identity/StoreSelect.vue'
 import { errorText } from '../../shared/presentation/zh'
 import { ref, watch } from 'vue'
 import { repairApi, type RepairContractor, type RepairRate } from './repairApi'
@@ -27,13 +28,22 @@ async function run(operation: () => Promise<void>) {
   finally { busy.value = false }
 }
 function load() { return run(async () => { contractors.value = await repairApi.contractors(storeId.value) }) }
-function select(contractor: RepairContractor) { return run(async () => {
-  selected.value = contractor
-  name.value = contractor.name; contactName.value = contractor.contactName ?? ''
-  email.value = contractor.email; phone.value = contractor.phone ?? ''
-  postalAddress.value = contractor.postalAddress ?? ''
-  rates.value = await repairApi.rates(storeId.value, contractor.contractorId)
-}) }
+function select(event: Event) {
+  const id = (event.target as HTMLSelectElement).value
+  const contractor = contractors.value.find(row => row.contractorId === id)
+  if (!contractor) {
+    selected.value = null; rates.value = []
+    name.value = ''; contactName.value = ''; email.value = ''; phone.value = ''; postalAddress.value = ''
+    return
+  }
+  return run(async () => {
+    selected.value = contractor; rates.value = []
+    name.value = contractor.name; contactName.value = contractor.contactName ?? ''
+    email.value = contractor.email; phone.value = contractor.phone ?? ''
+    postalAddress.value = contractor.postalAddress ?? ''
+    rates.value = await repairApi.rates(storeId.value, contractor.contractorId)
+  })
+}
 function create() { return run(async () => {
   selected.value = await repairApi.createContractor(storeId.value, name.value, contactName.value || null, email.value, phone.value || null, postalAddress.value)
   contractors.value = await repairApi.contractors(storeId.value)
@@ -64,10 +74,12 @@ function addRate() { return run(async () => {
   <section>
     <h1>维修承包商管理</h1>
     <p>在授权门店管理承包商及费率。历史费率按起止日期计算，各区间不能重叠。</p>
-    <label>门店编号<input
-      v-model.trim="storeId"
-      aria-label="门店编号"
-    ></label>
+    <StoreSelect
+      v-model="storeId"
+      label="门店编号"
+      role="MANAGER"
+      :disabled="busy"
+    />
     <button
       data-testid="load-contractors"
       :disabled="busy || !storeId"
@@ -87,20 +99,21 @@ function addRate() { return run(async () => {
     >
       {{ notice }}
     </p>
-    <ul>
-      <li
+    <label v-if="contractors.length">承包商档案<select
+      :value="selected?.contractorId ?? ''"
+      aria-label="承包商档案"
+      :disabled="busy"
+      @change="select"
+    >
+      <option value="">新增承包商</option>
+      <option
         v-for="contractor in contractors"
         :key="contractor.contractorId"
+        :value="contractor.contractorId"
       >
-        <button
-          :data-testid="`select-contractor-${contractor.contractorId}`"
-          :disabled="busy"
-          @click="select(contractor)"
-        >
-          {{ contractor.name }} · {{ contractor.active ? '有效' : '已停用' }}
-        </button>
-      </li>
-    </ul>
+        {{ contractor.name }} · {{ contractor.active ? '有效' : '已停用' }}
+      </option>
+    </select></label>
 
     <h2>{{ selected ? '编辑承包商' : '新增承包商' }}</h2>
     <label>姓名<input

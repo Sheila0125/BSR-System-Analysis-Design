@@ -1,3 +1,4 @@
+import { sessionOptions } from '../../../tests/unit/sessionOptions'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import EquipmentAvailabilityView from './EquipmentAvailabilityView.vue'
@@ -14,8 +15,8 @@ describe('AC-UC04/AC-BR13 authorized availability view', () => {
       equipmentCategory: 'SKI', skillLevel: 'INTERMEDIATE', homeStoreId: '3',
       currentStoreId: '3', status: 'AVAILABLE', currentDailyRate: '99.50',
     }])
-    const wrapper = mount(EquipmentAvailabilityView)
-    const inputs = wrapper.findAll('input')
+    const wrapper = mount(EquipmentAvailabilityView, sessionOptions(['3']))
+    const inputs = wrapper.findAll('select')
     await inputs[0]?.setValue('3')
     await inputs[1]?.setValue('SKI')
     await inputs[2]?.setValue('INTERMEDIATE')
@@ -36,8 +37,8 @@ describe('AC-UC04/AC-BR13 authorized availability view', () => {
       equipmentCategory: 'SKI', skillLevel: 'INTERMEDIATE', homeStoreId: '3',
       currentStoreId: '3', status: 'AVAILABLE', currentDailyRate: '90.00',
     }]).mockRejectedValueOnce(new Error('offline'))
-    const wrapper = mount(EquipmentAvailabilityView)
-    await wrapper.findAll('input')[0]?.setValue('3')
+    const wrapper = mount(EquipmentAvailabilityView, sessionOptions(['3']))
+    await wrapper.findAll('select')[0]?.setValue('3')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     await wrapper.get('input[type="checkbox"]').setValue(true)
@@ -47,6 +48,6 @@ describe('AC-UC04/AC-BR13 authorized availability view', () => {
     expect(wrapper.get('[role="alert"]').text()).toContain('检查连接')
     expect(wrapper.find('table').exists()).toBe(false)
     expect(wrapper.find('[aria-label="已选雪具"]').exists()).toBe(false)
-    expect((wrapper.findAll('input')[0]?.element as HTMLInputElement).value).toBe('3')
+    expect(wrapper.get('select[aria-label="门店编号"]').element).toHaveProperty('value', '3')
   })
 })

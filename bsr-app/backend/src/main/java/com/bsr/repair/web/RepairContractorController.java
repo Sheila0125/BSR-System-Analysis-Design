@@ -40,6 +40,13 @@ public class RepairContractorController {
                 .map(ContractorView::from).toList());
     }
 
+    @GetMapping("/assignment-choices")
+    List<ContractorChoice> assignmentChoices(@RequestParam String storeId, Authentication auth) {
+        return call(() -> service.assignmentChoices(actor(auth), id(storeId)).stream()
+                .map(value -> new ContractorChoice(Long.toString(value.id()), value.number(), value.name()))
+                .toList());
+    }
+
     @PostMapping
     ContractorView create(@RequestBody ContractorInput body, Authentication auth) {
         return call(() -> ContractorView.from(service.create(actor(auth), id(body.storeId()),
@@ -83,6 +90,7 @@ public class RepairContractorController {
     record ContractorInput(String storeId, String name, String contactName,
             String email, String phone, String postalAddress) { }
     record StoreInput(String storeId) { }
+    record ContractorChoice(String contractorId, String number, String name) { }
     record RateInput(String storeId, String effectiveFrom, String effectiveTo,
             String hourlyRate) { }
 

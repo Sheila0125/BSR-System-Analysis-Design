@@ -2,9 +2,11 @@ package com.bsr.storetransfer.store.application;
 
 import com.bsr.audit.api.AuditAppender;
 import com.bsr.identity.api.ActionPermission;
+import com.bsr.identity.api.ActiveRoleGrant;
 import com.bsr.identity.api.ActorContext;
 import com.bsr.identity.api.Authorization;
 import com.bsr.identity.api.IdentityType;
+import com.bsr.identity.api.RoleCode;
 import com.bsr.platform.error.ApiException;
 import com.bsr.scheduling.employee.api.EmployeeAccess;
 import com.bsr.storetransfer.infrastructure.persistence.StoreRepository;
@@ -12,6 +14,8 @@ import com.bsr.storetransfer.infrastructure.persistence.StoreRow;
 import com.bsr.storetransfer.store.api.StoreAccess;
 import com.bsr.storetransfer.store.api.StoreSnapshot;
 import java.time.LocalTime;
+import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -78,6 +82,20 @@ public class StoreAdministrationService {
         return repository.findById(storeId).map(StoreRow::snapshot)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "STORE_NOT_FOUND",
                         "Store does not exist."));
+    }
+
+    @Transactional(readOnly = true)
+    public List<StoreSnapshot> choices(ActorContext actor) {
+        if (actor.identityType() != IdentityType.EMPLOYEE) {
+            return List.of();
+        }
+        var grantedIds = actor.activeGrants().stream()
+                .filter(grant -> grant.role() == RoleCode.EMPLOYEE || grant.role() == RoleCode.MANAGER)
+                .map(ActiveRoleGrant::storeId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        return repository.findAllById(grantedIds).stream().map(StoreRow::snapshot).toList();
     }
 
     private void requireManager(ActorContext actor, long storeId) {

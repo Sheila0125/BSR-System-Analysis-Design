@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, provide, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { currentActor, type CurrentActor } from '../features/identity/authApi'
+import { loadStoreChoices, sessionActorKey, storeChoicesKey } from '../features/identity/sessionStores'
 import { featureMenuItems } from './routing/featureRegistry'
 import { authorizedMenu } from './routing/authorizedNavigation'
 import SkiIcon from '../shared/components/SkiIcon.vue'
@@ -9,6 +10,9 @@ import { uiText } from '../shared/presentation/zh'
 
 const route = useRoute()
 const actor = ref<CurrentActor | null>(null)
+const storeChoices = ref<Awaited<ReturnType<typeof loadStoreChoices>>>([])
+provide(sessionActorKey, actor)
+provide(storeChoicesKey, storeChoices)
 const menuOpen = ref(false)
 const menuItems = computed(() => authorizedMenu(actor.value, featureMenuItems))
 const isLogin = computed(() => route.fullPath.split('?')[0] === '/identity/login')
@@ -42,6 +46,22 @@ function iconFor(path: string) {
   return 'file'
 }
 let requestVersion = 0
+watch(() => {
+  const current = actor.value
+  const ids = current?.grants.flatMap(grant => grant.storeId ? [grant.storeId] : []).sort()
+  return ids?.length ? JSON.stringify([current?.accountId, ids]) : ''
+}, async (scope, _previous, onCleanup) => {
+  storeChoices.value = []
+  if (!scope) return
+  let current = true
+  onCleanup(() => { current = false })
+  try {
+    const choices = await loadStoreChoices()
+    if (current) storeChoices.value = choices
+  } catch {
+    // Store IDs from the session remain available if names cannot be loaded.
+  }
+})
 watch(() => route.fullPath, async () => {
   menuOpen.value = false
   const currentVersion = ++requestVersion

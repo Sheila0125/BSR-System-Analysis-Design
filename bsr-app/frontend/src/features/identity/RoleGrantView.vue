@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StoreSelect from './StoreSelect.vue'
 import { problemText } from '../../shared/presentation/zh'
 import { uiText } from '../../shared/presentation/zh'
 import { computed, ref, watch } from 'vue'
@@ -116,11 +117,14 @@ async function revokeGrant() {
         <option value="MANAGER">门店经理</option>
         <option value="CONTRACTOR">维修承包商</option>
       </select></label>
-      <label v-if="roleNeedsStore">门店编号<input
-        v-model.trim="storeId"
-        inputmode="numeric"
-        required
-      ></label>
+      <StoreSelect
+        v-if="roleNeedsStore"
+        v-model="storeId"
+        label="门店编号"
+        role="MANAGER"
+        :select-only-option="false"
+        :disabled="submitting"
+      />
       <label>生效时间<input
         v-model="validFrom"
         type="datetime-local"

@@ -15,10 +15,6 @@ const errorMessage = ref('')
 async function search() {
   errorMessage.value = ''
   searched.value = false
-  if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(objectType.value)) {
-    errorMessage.value = '业务对象类型须填写大写编码，例如 ROLE_GRANT。'
-    return
-  }
   if (!/^[1-9]\d*$/.test(objectId.value)) {
     errorMessage.value = '请输入有效的正整数业务对象编号。'
     return
@@ -50,11 +46,14 @@ async function search() {
       class="audit-search"
       @submit.prevent="search"
     >
-      <label>业务对象类型<input
-        v-model.trim="objectType"
-        maxlength="40"
-        required
-      ></label>
+      <label>业务对象类型<select
+        v-model="objectType"
+        :disabled="loading"
+      >
+        <option value="ROLE_GRANT">角色授权</option>
+        <option value="RENTAL_CONTRACT">租赁合同</option>
+        <option value="EQUIPMENT">雪具档案</option>
+      </select></label>
       <label>业务对象编号<input
         v-model.trim="objectId"
         inputmode="numeric"

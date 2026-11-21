@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import StoreSelect from '../identity/StoreSelect.vue'
 import { problemText } from '../../shared/presentation/zh'
 import { uiText } from '../../shared/presentation/zh'
-import { computed, ref } from 'vue'
+import { equipmentCategories, equipmentSkillLevels } from './equipmentChoices'
+import { computed, ref, watch } from 'vue'
 import { ApiError } from '../../shared/http/apiClient'
 import { loadAvailableEquipment, type AvailableEquipment } from './equipmentAvailabilityApi'
 
@@ -13,6 +15,9 @@ const selectedIds = ref<string[]>([])
 const loaded = ref(false)
 const loading = ref(false)
 const errorMessage = ref('')
+watch([storeId, category, skillLevel], () => {
+  equipment.value = []; selectedIds.value = []; loaded.value = false; errorMessage.value = ''
+})
 const selected = computed(() => equipment.value.filter(item => selectedIds.value.includes(item.equipmentId)))
 
 async function search() {
@@ -50,24 +55,37 @@ async function search() {
       class="equipment-search"
       @submit.prevent="search"
     >
-      <label>门店编号<input
-        v-model.trim="storeId"
-        inputmode="numeric"
-        required
-      ></label>
-      <label>雪具类别<input
-        v-model.trim="category"
-        maxlength="40"
-        placeholder="选填，例如 SKI（双板）"
-      ></label>
-      <label>技术等级<input
-        v-model.trim="skillLevel"
-        maxlength="40"
-        placeholder="选填，例如 INTERMEDIATE（中级）"
-      ></label>
+      <StoreSelect
+        v-model="storeId"
+        label="门店编号"
+        role="EITHER"
+        :disabled="loading"
+      />
+      <label>雪具类别<select
+        v-model="category"
+        :disabled="loading"
+      >
+        <option value="">所有类别</option>
+        <option
+          v-for="value in equipmentCategories"
+          :key="value"
+          :value="value"
+        >{{ uiText(value) }}</option>
+      </select></label>
+      <label>技术等级<select
+        v-model="skillLevel"
+        :disabled="loading"
+      >
+        <option value="">所有等级</option>
+        <option
+          v-for="value in equipmentSkillLevels"
+          :key="value"
+          :value="value"
+        >{{ uiText(value) }}</option>
+      </select></label>
       <button
         type="submit"
-        :disabled="loading"
+        :disabled="loading || !storeId"
       >
         {{ loading ? '查询中…' : '查询可租雪具' }}
       </button>

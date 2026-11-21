@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StoreSelect from '../identity/StoreSelect.vue'
 import { errorText } from '../../shared/presentation/zh'
 import { uiText } from '../../shared/presentation/zh'
 import { ref, watch } from 'vue'
@@ -36,10 +37,12 @@ function reportException(transfer: Transfer, itemId: string) { return run(async 
   <section>
     <h1>雪具调拨交接</h1>
     <p>雪具逐件交接，调出门店员工发出，调入门店员工接收。</p>
-    <label>交接门店编号<input
-      v-model.trim="storeId"
-      aria-label="交接门店编号"
-    ></label>
+    <StoreSelect
+      v-model="storeId"
+      label="交接门店编号"
+      role="EMPLOYEE"
+      :disabled="busy"
+    />
     <button
       data-testid="load-handoffs"
       :disabled="busy || !storeId"

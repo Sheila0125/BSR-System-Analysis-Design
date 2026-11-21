@@ -1,3 +1,4 @@
+import { sessionOptions } from '../../../tests/unit/sessionOptions'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import EmployeeRequestQueueView from './EmployeeRequestQueueView.vue'
@@ -36,8 +37,8 @@ describe('AC-UC04/AC-BR05 EmployeeRequestQueueView', () => {
       status: 'ACCEPTED',
       acceptedByEmployeeId: '17',
     })
-    const wrapper = mount(EmployeeRequestQueueView)
-    await wrapper.get('input[inputmode="numeric"]').setValue('3')
+    const wrapper = mount(EmployeeRequestQueueView, sessionOptions(['3']))
+    await wrapper.get('select[aria-label="门店编号"]').setValue('3')
     await wrapper.get('.queue-search').trigger('submit')
     await flushPromises()
 
@@ -57,8 +58,8 @@ describe('AC-UC04/AC-BR05 EmployeeRequestQueueView', () => {
   it('keeps the loaded queue and store input when a write fails', async () => {
     apiMocks.loadEmployeeRentalRequests.mockResolvedValue([pending])
     apiMocks.requestMoreInformation.mockRejectedValue(new Error('offline'))
-    const wrapper = mount(EmployeeRequestQueueView)
-    const store = wrapper.get('input[inputmode="numeric"]')
+    const wrapper = mount(EmployeeRequestQueueView, sessionOptions(['3']))
+    const store = wrapper.get('select[aria-label="门店编号"]')
     await store.setValue('3')
     await wrapper.get('.queue-search').trigger('submit')
     await flushPromises()

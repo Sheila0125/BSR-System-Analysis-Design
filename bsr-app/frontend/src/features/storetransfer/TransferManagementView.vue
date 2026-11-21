@@ -1,13 +1,16 @@
 <script setup lang="ts">
+import StoreSelect from '../identity/StoreSelect.vue'
 import { errorText } from '../../shared/presentation/zh'
 import { uiText } from '../../shared/presentation/zh'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import EquipmentPicker from '../equipment/EquipmentPicker.vue'
 import { storeTransferApi, type Store, type Transfer, type TransferType } from './storeTransferApi'
 
 const sourceStoreId = ref('')
 const destinationStoreId = ref('')
 const transferType = ref<TransferType>('TEMPORARY')
-const equipmentIds = ref('')
+const equipmentIds = ref<string[]>([])
+const pickerVersion = ref(0)
 const transfers = ref<Transfer[]>([])
 const authorityStoreId = ref('')
 const managedStoreId = ref('')
@@ -20,6 +23,12 @@ const store = ref<Store | null>(null)
 const busy = ref(false)
 const error = ref('')
 const notice = ref('')
+watch(sourceStoreId, () => { equipmentIds.value = []; transfers.value = [] })
+watch(managedStoreId, () => {
+  if (!store.value || managedStoreId.value === store.value.storeId) return
+  store.value = null
+  storeNumber.value = ''; storeName.value = ''; address.value = ''; openingTime.value = ''; closingTime.value = ''
+})
 
 async function run(operation: () => Promise<void>) {
   if (busy.value) return
@@ -29,8 +38,9 @@ async function run(operation: () => Promise<void>) {
 }
 function loadTransfers() { return run(async () => { transfers.value = await storeTransferApi.listTransfers(sourceStoreId.value) }) }
 function createTransfer() { return run(async () => {
-  const ids = equipmentIds.value.split(/[\s,]+/).filter(Boolean)
-  const created = await storeTransferApi.createTransfer(sourceStoreId.value, destinationStoreId.value, transferType.value, ids)
+  const created = await storeTransferApi.createTransfer(sourceStoreId.value, destinationStoreId.value, transferType.value, equipmentIds.value)
+  equipmentIds.value = []
+  pickerVersion.value++
   transfers.value = [created, ...transfers.value.filter(transfer => transfer.transferId !== created.transferId)]
   notice.value = `调拨 ${created.transferNumber} 已发起，请另行批准。`
 }) }
@@ -77,26 +87,35 @@ function updateStore() { return run(async () => {
     </p>
     <section>
       <h2>调拨记录</h2>
-      <label>调出门店编号<input
-        v-model.trim="sourceStoreId"
-        aria-label="调出门店编号"
-      ></label>
-      <label>调入门店编号<input
-        v-model.trim="destinationStoreId"
-        aria-label="调入门店编号"
-      ></label>
+      <StoreSelect
+        v-model="sourceStoreId"
+        label="调出门店编号"
+        role="MANAGER"
+        :select-only-option="false"
+        :disabled="busy"
+      />
+      <StoreSelect
+        v-model="destinationStoreId"
+        label="调入门店编号"
+        role="MANAGER"
+        :exclude="sourceStoreId"
+        :select-only-option="false"
+        :disabled="busy"
+      />
       <label>调拨类型<select
         v-model="transferType"
         aria-label="调拨类型"
       ><option value="TEMPORARY">临时调拨</option><option value="PERMANENT">永久调拨</option></select></label>
-      <label>雪具编号<input
-        v-model="equipmentIds"
-        aria-label="雪具编号"
-        placeholder="雪具编号（用英文逗号分隔）"
-      ></label>
+      <EquipmentPicker
+        :key="pickerVersion"
+        :store-id="sourceStoreId"
+        :disabled="busy"
+        transfer
+        @selection="equipmentIds = $event.map(item => item.equipmentId)"
+      />
       <button
         data-testid="create-transfer"
-        :disabled="busy || !sourceStoreId || !destinationStoreId || !equipmentIds.trim()"
+        :disabled="busy || !sourceStoreId || !destinationStoreId || !equipmentIds.length"
         @click="createTransfer"
       >
         发起调拨
@@ -127,14 +146,20 @@ function updateStore() { return run(async () => {
     </section>
     <section>
       <h2>门店详情</h2>
-      <label>授权门店编号<input
-        v-model.trim="authorityStoreId"
-        aria-label="授权门店编号"
-      ></label>
-      <label>管理门店编号<input
-        v-model.trim="managedStoreId"
-        aria-label="管理门店编号"
-      ></label>
+      <StoreSelect
+        v-model="authorityStoreId"
+        label="授权门店编号"
+        role="MANAGER"
+        :select-only-option="false"
+        :disabled="busy"
+      />
+      <StoreSelect
+        v-model="managedStoreId"
+        label="管理门店编号"
+        role="MANAGER"
+        :select-only-option="false"
+        :disabled="busy"
+      />
       <button
         data-testid="load-store"
         :disabled="busy || !managedStoreId"
@@ -173,7 +198,7 @@ function updateStore() { return run(async () => {
       </button>
       <button
         data-testid="update-store"
-        :disabled="busy || !managedStoreId || !storeName"
+        :disabled="busy || !managedStoreId || store?.storeId !== managedStoreId || !storeName"
         @click="updateStore"
       >
         更新门店

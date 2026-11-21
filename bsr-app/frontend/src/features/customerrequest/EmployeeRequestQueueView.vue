@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StoreSelect from '../identity/StoreSelect.vue'
 import { problemText } from '../../shared/presentation/zh'
 import { uiText } from '../../shared/presentation/zh'
 import { ref } from 'vue'
@@ -95,11 +96,12 @@ async function requestSupplement(request: EmployeeRentalRequest) {
       class="queue-search"
       @submit.prevent="loadQueue"
     >
-      <label>门店编号<input
-        v-model.trim="storeId"
-        inputmode="numeric"
-        required
-      ></label>
+      <StoreSelect
+        v-model="storeId"
+        label="门店编号"
+        role="EMPLOYEE"
+        :disabled="loading"
+      />
       <button
         type="submit"
         :disabled="loading"

@@ -11,6 +11,7 @@ import com.bsr.identity.api.AccountAuthentication;
 import com.bsr.identity.api.ActorContext;
 import com.bsr.storetransfer.store.api.StoreSnapshot;
 import com.bsr.storetransfer.store.application.StoreAdministrationService;
+import java.util.List;
 import tools.jackson.databind.JsonNode;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,6 +36,13 @@ public class StoreController {
     @GetMapping
     StoreView get(@RequestParam String storeId, Authentication auth) {
         return call(() -> StoreView.from(service.get(actor(auth), id(storeId))));
+    }
+
+    @GetMapping("/choices")
+    List<StoreChoice> choices(Authentication auth) {
+        return service.choices(actor(auth)).stream()
+                .map(store -> new StoreChoice(Long.toString(store.storeId()), store.storeNumber(), store.storeName()))
+                .toList();
     }
 
     @PostMapping
@@ -66,6 +74,8 @@ public class StoreController {
     private ActorContext actor(Authentication auth) {
         return accounts.loadActor(((BsrAccountPrincipal) auth.getPrincipal()).accountId());
     }
+
+    record StoreChoice(String storeId, String storeNumber, String storeName) { }
 
     record StoreView(String storeId, String storeNumber, String storeName, String address,
             String businessStatus, String openingTime, String closingTime) {

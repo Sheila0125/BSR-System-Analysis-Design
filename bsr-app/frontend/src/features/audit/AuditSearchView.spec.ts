@@ -17,7 +17,7 @@ describe('AC-BR40 AuditSearchView', () => {
     }])
     const wrapper = mount(AuditSearchView)
     const inputs = wrapper.findAll('input')
-    await inputs[1]?.setValue('71')
+    await inputs[0]?.setValue('71')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -29,7 +29,7 @@ describe('AC-BR40 AuditSearchView', () => {
   it('rejects malformed object IDs before sending a request', async () => {
     const wrapper = mount(AuditSearchView)
     const inputs = wrapper.findAll('input')
-    await inputs[1]?.setValue('0')
+    await inputs[0]?.setValue('0')
     await wrapper.find('form').trigger('submit')
 
     expect(auditMocks.findAuditEvents).not.toHaveBeenCalled()

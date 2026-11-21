@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import StoreSelect from '../identity/StoreSelect.vue'
 import { errorText } from '../../shared/presentation/zh'
 import { uiText } from '../../shared/presentation/zh'
 import { ref, watch } from 'vue'
+import { useStoreOptions } from '../../shared/components/useStoreOptions'
+import { loadEmployeeRentalRequests } from '../customerrequest/employeeRequestApi'
 import EquipmentPicker from '../equipment/EquipmentPicker.vue'
 import RentalInvoice from './RentalInvoice.vue'
 import type { AvailableEquipment } from '../equipment/equipmentAvailabilityApi'
@@ -9,6 +12,9 @@ import { rentalApi, type Contract, type ChangeRequest, type TransactionInput, ty
 
 const storeId = ref('')
 const sourceRequestId = ref('')
+const {
+  options: requests, loading: requestsLoading, error: requestsError, refresh: refreshRequests,
+} = useStoreOptions(storeId, async id => (await loadEmployeeRentalRequests(id)).filter(row => row.status === 'ACCEPTED'))
 const selection = ref<AvailableEquipment[]>([])
 const contracts = ref<Contract[]>([])
 const changes = ref<ChangeRequest[]>([])
@@ -22,7 +28,7 @@ const history = ref<RecordedTransaction[]>([])
 const invoiceOpen = ref(false)
 const invoiceVersion = ref(0)
 const pickerGeneration = ref(0)
-watch(storeId, () => { contracts.value = []; changes.value = []; contract.value = null; selection.value = []; pendingItems.value = []; chargeId.value = ''; history.value = [] })
+watch(storeId, () => { sourceRequestId.value = ''; contracts.value = []; changes.value = []; contract.value = null; selection.value = []; pendingItems.value = []; chargeId.value = ''; history.value = [] })
 async function run(operation: () => Promise<void>) {
   if (busy.value) return
   busy.value = true
@@ -35,13 +41,24 @@ function selectContract(value: Contract) {
   contract.value = value; pendingItems.value = []; history.value = []; chargeId.value = ''
   invoiceVersion.value++
 }
-function load() { return run(async () => { contracts.value = await rentalApi.list(storeId.value); changes.value = await rentalApi.changes(storeId.value) }) }
+function load() { return run(async () => {
+  refreshRequests()
+  const [listedContracts, listedChanges] = await Promise.all([rentalApi.list(storeId.value), rentalApi.changes(storeId.value)])
+  contracts.value = listedContracts
+  changes.value = listedChanges
+}) }
+function pickContract(event: Event) {
+  const id = (event.target as HTMLSelectElement).value
+  const chosen = contracts.value.find(row => row.contractId === id)
+  if (chosen) selectContract(chosen)
+}
 function create() { return run(async () => {
-  if (!/^[1-9]\d{0,18}$/.test(storeId.value)) throw new Error('门店编号必须是正整数，请填写您有权限的门店编号。')
-  if (!/^[1-9]\d{0,18}$/.test(sourceRequestId.value)) throw new Error('来源需求编号必须是正整数。请先在需求队列受理需求，再填写该需求的数字 ID；不要填写需求单号或自编编号。')
+  if (!requests.value.some(row => row.requestId === sourceRequestId.value)) return
   selectContract(await rentalApi.create(storeId.value, sourceRequestId.value, selection.value.map(i => ({ equipmentId: i.equipmentId, expectedDailyRate: i.currentDailyRate }))))
+  sourceRequestId.value = ''
   selection.value = []
   pickerGeneration.value++
+  refreshRequests()
   contracts.value = await rentalApi.list(storeId.value)
 }) }
 function refresh() { return run(async () => { if (contract.value) selectContract(await rentalApi.read(contract.value.contractId)) }) }
@@ -66,13 +83,14 @@ function showHistory() { return run(async () => { history.value = await rentalAp
   <section>
     <h1>租赁办理</h1>
     <p>在授权门店办理租赁。顾客可在小程序查看发票并体验模拟付款；外部付款仍在此核实登记。</p>
-    <label>门店编号<input
-      v-model.trim="storeId"
-      aria-label="门店编号"
+    <StoreSelect
+      v-model="storeId"
+      label="门店编号"
+      role="EMPLOYEE"
       :disabled="busy"
-    ></label>
+    />
     <button
-      :disabled="busy"
+      :disabled="busy || !storeId"
       @click="load"
     >
       查询合同与变更需求
@@ -84,35 +102,59 @@ function showHistory() { return run(async () => { history.value = await rentalAp
       {{ error }}
     </p>
     <h2>根据已受理需求创建合同</h2>
-    <label>来源需求编号<input
-      v-model.trim="sourceRequestId"
-      aria-label="来源需求编号"
-    ></label>
-    <p>来源需求编号请使用需求队列显示的数字 ID，不是需求单号；仅已受理的需求可创建合同。</p>
+    <label>已受理需求<select
+      v-model="sourceRequestId"
+      aria-label="已受理需求"
+      :disabled="busy || requestsLoading || !requests.length"
+    >
+      <option
+        value=""
+        disabled
+      >{{ requestsLoading ? '正在加载需求…' : requests.length ? '选择需求单' : '暂无已受理需求' }}</option>
+      <option
+        v-for="row in requests"
+        :key="row.requestId"
+        :value="row.requestId"
+      >
+        {{ row.requestNumber }} · {{ row.rentalStartDate }} · {{ row.rentalDays }} 天
+      </option>
+    </select></label>
+    <p
+      v-if="requestsError"
+      role="alert"
+    >
+      {{ requestsError }}
+    </p>
     <EquipmentPicker
       :key="pickerGeneration"
       :store-id="storeId"
+      :disabled="busy"
       @selection="selection = $event"
     />
     <button
-      :disabled="busy || selection.length === 0"
+      :disabled="busy || requestsLoading || !requests.some(row => row.requestId === sourceRequestId) || selection.length === 0"
       @click="create"
     >
       创建合同草稿
     </button>
-    <ul>
-      <li
+    <label v-if="contracts.length">门店合同<select
+      :value="contract?.contractId ?? ''"
+      aria-label="门店合同"
+      :disabled="busy"
+      @change="pickContract"
+    >
+      <option
+        value=""
+        disabled
+      >选择合同</option>
+      <option
         v-for="c in contracts"
         :key="c.contractId"
+        :value="c.contractId"
       >
-        <button
-          :disabled="busy"
-          @click="selectContract(c)"
-        >
-          {{ c.contractNumber }} · {{ uiText(c.status) }} · {{ c.amountDue }}
-        </button>
-      </li>
-    </ul>
+        {{ c.contractNumber }} · {{ uiText(c.status) }} · {{ c.amountDue }} NOK
+      </option>
+    </select></label>
     <article v-if="contract">
       <h2>{{ contract.contractNumber }} · {{ uiText(contract.status) }}</h2>
       <p>顾客 {{ contract.customerId }} · {{ contract.rentalStartDate }} · {{ contract.rentalDays }} 整日 · 合同应付合计 {{ contract.amountDue }}</p>

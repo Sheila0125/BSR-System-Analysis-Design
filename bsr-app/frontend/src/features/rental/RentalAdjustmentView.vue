@@ -1,19 +1,23 @@
 <script setup lang="ts">
+import StoreSelect from '../identity/StoreSelect.vue'
 import { errorText } from '../../shared/presentation/zh'
 import { uiText } from '../../shared/presentation/zh'
 import { ref, watch } from 'vue'
+import { useStoreOptions } from '../../shared/components/useStoreOptions'
 import EquipmentPicker from '../equipment/EquipmentPicker.vue'
 import type { AvailableEquipment } from '../equipment/equipmentAvailabilityApi'
 import { rentalApi, type Adjustment, type ChangeRequest, type TransactionInput, type RecordedTransaction } from './rentalApi'
 
 const storeId = ref(''), contractId = ref(''), changeId = ref(''), type = ref('REPLACE')
+const { options: contracts, loading: contractsLoading, error: contractsError } = useStoreOptions(storeId, rentalApi.list)
+const manualContract = ref(false), manualChange = ref(false)
 const detail = ref<Adjustment | null>(null), queue = ref<ChangeRequest[]>([])
 const selection = ref<AvailableEquipment[]>([]), returned = ref<string[]>([]), issued = ref<string[]>([])
 const outcomes = ref<Record<string, string>>({}), notes = ref<Record<string, string>>({})
 const busy = ref(false), error = ref(''), pickerGeneration = ref(0), chargeId = ref('')
 const history = ref<RecordedTransaction[]>([])
 const result = ref<TransactionInput>({ type: 'SUPPLEMENT', externalId: '', amount: '', status: 'PENDING_CONFIRMATION', processedAt: null })
-watch(storeId, () => { detail.value = null; queue.value = []; selection.value = []; returned.value = []; issued.value = []; outcomes.value = {}; notes.value = {}; history.value = []; chargeId.value = '' })
+watch(storeId, () => { contractId.value = ''; changeId.value = ''; detail.value = null; queue.value = []; selection.value = []; returned.value = []; issued.value = []; outcomes.value = {}; notes.value = {}; history.value = []; chargeId.value = '' })
 async function run(operation: () => Promise<void>) {
   if (busy.value) return
   busy.value = true; error.value = ''
@@ -21,7 +25,7 @@ async function run(operation: () => Promise<void>) {
   finally { busy.value = false }
 }
 function apply(value: Adjustment) {
-  if (value.change.requestedStoreId !== storeId.value) throw new Error('请先填写实际办理门店。')
+  if (value.change.requestedStoreId !== storeId.value) throw new Error('请先选择实际办理门店。')
   if (detail.value?.change.changeId !== value.change.changeId) {
     selection.value = []; returned.value = []; issued.value = []; outcomes.value = {}; notes.value = {}
     chargeId.value = ''; history.value = []; pickerGeneration.value++
@@ -30,39 +34,39 @@ function apply(value: Adjustment) {
 }
 function load() { return run(async () => { apply(await rentalApi.adjustment(changeId.value)) }) }
 function loadQueue() { return run(async () => { queue.value = await rentalApi.changes(storeId.value) }) }
-function open(value: ChangeRequest) { changeId.value = value.changeId; return load() }
 function start() { return run(async () => { apply(await rentalApi.startAdjustment(contractId.value, storeId.value, type.value)) }) }
 function receive() { return run(async () => {
-  apply(await rentalApi.receiveAdjustment(changeId.value, returned.value.map(itemId => ({ itemId, outcome: outcomes.value[itemId] ?? 'NORMAL', faultDescription: notes.value[itemId] || null }))))
+  apply(await rentalApi.receiveAdjustment(detail.value!.change.changeId, returned.value.map(itemId => ({ itemId, outcome: outcomes.value[itemId] ?? 'NORMAL', faultDescription: notes.value[itemId] || null }))))
   returned.value = []
 }) }
 function quote() { return run(async () => {
-  apply(await rentalApi.quoteAdjustment(changeId.value, selection.value.map(i => ({ equipmentId: i.equipmentId, expectedDailyRate: i.currentDailyRate }))))
+  apply(await rentalApi.quoteAdjustment(detail.value!.change.changeId, selection.value.map(i => ({ equipmentId: i.equipmentId, expectedDailyRate: i.currentDailyRate }))))
   selection.value = []; pickerGeneration.value++
 }) }
-function stop() { return run(async () => { apply(await rentalApi.stopAdjustment(changeId.value)); selection.value = []; pickerGeneration.value++ }) }
+function stop() { return run(async () => { apply(await rentalApi.stopAdjustment(detail.value!.change.changeId)); selection.value = []; pickerGeneration.value++ }) }
 function record() { return run(async () => {
   await rentalApi.record(chargeId.value, { ...result.value, processedAt: result.value.processedAt || null })
   history.value = await rentalApi.transactions(chargeId.value)
-  apply(await rentalApi.adjustment(changeId.value))
+  apply(await rentalApi.adjustment(detail.value!.change.changeId))
 }) }
 function showHistory() { return run(async () => { history.value = await rentalApi.transactions(chargeId.value) }) }
 function issue() { return run(async () => {
-  await rentalApi.issueAtStore(contractId.value, storeId.value, issued.value)
-  apply(await rentalApi.adjustment(changeId.value)); issued.value = []
+  await rentalApi.issueAtStore(detail.value!.change.contractId, storeId.value, issued.value)
+  apply(await rentalApi.adjustment(detail.value!.change.changeId)); issued.value = []
 }) }
 </script>
 <template>
   <section>
     <h1>正式租赁调整</h1>
     <p>先接收并检查实物，后续选具或外部交易失败不会撤销已提交的归还。最终报价由顾客在小程序确认。</p>
-    <label>办理门店编号<input
-      v-model.trim="storeId"
-      aria-label="调整办理门店编号"
+    <StoreSelect
+      v-model="storeId"
+      label="调整办理门店编号"
+      role="EMPLOYEE"
       :disabled="busy"
-    ></label>
+    />
     <button
-      :disabled="busy"
+      :disabled="busy || !storeId"
       @click="loadQueue"
     >
       查询门店需求
@@ -72,12 +76,7 @@ function issue() { return run(async () => {
         v-for="c in queue"
         :key="c.changeId"
       >
-        <button
-          :disabled="busy"
-          @click="open(c)"
-        >
-          {{ c.changeNumber }} · {{ uiText(c.type) }} · {{ uiText(c.status) }} · {{ c.note }}
-        </button>
+        {{ c.changeNumber }} · {{ uiText(c.type) }} · {{ uiText(c.status) }} · {{ c.note }}
         <p
           v-if="c.requestedReturnItemIds?.length"
           :data-test="`return-intent-${c.changeId}`"
@@ -86,28 +85,85 @@ function issue() { return run(async () => {
         </p>
       </li>
     </ul>
-    <label>合同编号<input
+    <h2>发起调整</h2>
+    <label v-if="manualContract">合同编号<input
       v-model.trim="contractId"
+      inputmode="numeric"
       :disabled="busy"
     ></label>
+    <label v-else>合同<select
+      v-model="contractId"
+      aria-label="合同"
+      :disabled="busy || contractsLoading || !contracts.length"
+    >
+      <option
+        value=""
+        disabled
+      >{{ contractsLoading ? '正在加载合同…' : contracts.length ? '选择合同' : '本店暂无合同' }}</option>
+      <option
+        v-for="row in contracts"
+        :key="row.contractId"
+        :value="row.contractId"
+      >
+        {{ row.contractNumber }} · {{ uiText(row.status) }}
+      </option>
+    </select></label>
+    <button
+      type="button"
+      :disabled="busy"
+      @click="manualContract = !manualContract; contractId = detail?.change.contractId ?? ''"
+    >
+      {{ manualContract ? '返回本店合同列表' : '按合同编号办理' }}
+    </button>
+    <p
+      v-if="!manualContract && contractsError"
+      role="alert"
+    >
+      {{ contractsError }}
+    </p>
     <label>类型<select
       v-model="type"
       :disabled="busy"
     ><option value="ADD">新增</option><option value="REMOVE">减少</option><option value="REPLACE">更换</option><option value="PARTIAL_RETURN">部分归还</option></select></label>
     <button
-      :disabled="busy"
+      :disabled="busy || !storeId || !contractId"
       @click="start"
     >
       开始办理调整
     </button>
-    <label>变更编号<input
+    <h2>查询已提交的调整</h2>
+    <label v-if="manualChange">变更编号<input
       v-model.trim="changeId"
-      aria-label="变更编号"
+      inputmode="numeric"
       :disabled="busy"
     ></label>
+    <label v-else>门店变更需求<select
+      v-model="changeId"
+      aria-label="门店变更需求"
+      :disabled="busy || !queue.length"
+    >
+      <option
+        value=""
+        disabled
+      >{{ queue.length ? '选择变更单' : '请先查询门店需求' }}</option>
+      <option
+        v-for="row in queue"
+        :key="row.changeId"
+        :value="row.changeId"
+      >
+        {{ row.changeNumber }} · {{ uiText(row.type) }} · {{ uiText(row.status) }}
+      </option>
+    </select></label>
+    <button
+      type="button"
+      :disabled="busy"
+      @click="manualChange = !manualChange; changeId = detail?.change.changeId ?? ''"
+    >
+      {{ manualChange ? '返回门店变更列表' : '按变更编号查询' }}
+    </button>
     <button
       data-test="load-adjustment"
-      :disabled="busy"
+      :disabled="busy || !storeId || !changeId"
       @click="load"
     >
       查询或刷新调整
@@ -178,6 +234,7 @@ function issue() { return run(async () => {
         v-if="['ADD','REPLACE'].includes(detail.change.type) && detail.change.amountDelta === null"
         :key="pickerGeneration"
         :store-id="storeId"
+        :disabled="busy"
         @selection="selection = $event"
       />
       <button

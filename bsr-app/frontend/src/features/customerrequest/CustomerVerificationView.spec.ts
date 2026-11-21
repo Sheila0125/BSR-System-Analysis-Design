@@ -1,3 +1,4 @@
+import { sessionOptions } from '../../../tests/unit/sessionOptions'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CustomerVerificationView from './CustomerVerificationView.vue'
@@ -18,9 +19,9 @@ describe('AC-BR06 employee customer verification', () => {
     apiMocks.findCustomer.mockResolvedValue(profile)
     apiMocks.reviewCustomerMeasurements.mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce({ ...profile, heightCm: '171.25', heightEstimated: false })
-    const wrapper = mount(CustomerVerificationView)
-    await wrapper.findAll('input')[0]?.setValue('3')
-    await wrapper.findAll('input')[1]?.setValue('C-42')
+    const wrapper = mount(CustomerVerificationView, sessionOptions(['3']))
+    await wrapper.get('select[aria-label="门店编号"]').setValue('3')
+    await wrapper.get('input').setValue('C-42')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
@@ -47,10 +48,10 @@ describe('AC-BR06 employee customer verification', () => {
       heightCm: '170.25', weightKg: null, bootSize: '42.5',
       heightEstimated: true, weightEstimated: false, bootSizeEstimated: false,
     })
-    const wrapper = mount(CustomerVerificationView)
+    const wrapper = mount(CustomerVerificationView, sessionOptions(['3']))
     const inputs = wrapper.findAll('input')
-    await inputs[0]?.setValue('3')
-    await inputs[1]?.setValue('C-42')
+    await wrapper.get('select[aria-label="门店编号"]').setValue('3')
+    await inputs[0]?.setValue('C-42')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
@@ -66,10 +67,10 @@ describe('AC-BR06 employee customer verification', () => {
       bootSize: null, heightEstimated: false, weightEstimated: false,
       bootSizeEstimated: false,
     }).mockRejectedValueOnce(new Error('offline'))
-    const wrapper = mount(CustomerVerificationView)
+    const wrapper = mount(CustomerVerificationView, sessionOptions(['3']))
     const inputs = wrapper.findAll('input')
-    await inputs[0]?.setValue('3')
-    await inputs[1]?.setValue('C-1')
+    await wrapper.get('select[aria-label="门店编号"]').setValue('3')
+    await inputs[0]?.setValue('C-1')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     await wrapper.get('form').trigger('submit')
@@ -77,6 +78,6 @@ describe('AC-BR06 employee customer verification', () => {
 
     expect(wrapper.get('[role="alert"]').text()).toContain('检查连接')
     expect(wrapper.find('.verification-result').exists()).toBe(false)
-    expect((inputs[1]?.element as HTMLInputElement).value).toBe('C-1')
+    expect((inputs[0]?.element as HTMLInputElement).value).toBe('C-1')
   })
 })

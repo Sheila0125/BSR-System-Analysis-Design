@@ -1,14 +1,16 @@
+import { sessionOptions } from '../../../tests/unit/sessionOptions'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, expect, it, vi } from 'vitest'
 import RentalAdjustmentView from './RentalAdjustmentView.vue'
 import EquipmentPicker from '../equipment/EquipmentPicker.vue'
-const api = vi.hoisted(() => ({ adjustment: vi.fn(), quoteAdjustment: vi.fn(), receiveAdjustment: vi.fn(), stopAdjustment: vi.fn(), startAdjustment: vi.fn(), changes: vi.fn(), record: vi.fn(), transactions: vi.fn(), issueAtStore: vi.fn() }))
+const api = vi.hoisted(() => ({ list: vi.fn(async () => []), adjustment: vi.fn(), quoteAdjustment: vi.fn(), receiveAdjustment: vi.fn(), stopAdjustment: vi.fn(), startAdjustment: vi.fn(), changes: vi.fn(), record: vi.fn(), transactions: vi.fn(), issueAtStore: vi.fn() }))
 vi.mock('./rentalApi', () => ({ rentalApi: api }))
+vi.mock('../equipment/equipmentAvailabilityApi', () => ({ loadAvailableEquipment: vi.fn(async () => []) }))
 beforeEach(() => vi.clearAllMocks())
 it('shows the customer requested return IDs separately without preselecting a physical return', async () => {
   api.changes.mockResolvedValue([{ changeId: '9', contractId: '7', changeNumber: 'CG-9', type: 'REMOVE', status: 'SUBMITTED',
     requestedStoreId: '3', note: 'Return one ski', requestedReturnItemIds: ['8'] }])
-  const wrapper = mount(RentalAdjustmentView)
+  const wrapper = mount(RentalAdjustmentView, sessionOptions(['3']))
   await wrapper.get('[aria-label="调整办理门店编号"]').setValue('3')
   await wrapper.findAll('button').find(button => button.text() === '查询门店需求')!.trigger('click')
   await flushPromises()
@@ -19,9 +21,10 @@ it('shows the customer requested return IDs separately without preselecting a ph
 it('AC-UC05 failed quote keeps incoming observed selection and committed return visible', async () => {
   api.adjustment.mockResolvedValue({ change: { changeId: '9', contractId: '7', requestedStoreId: '3', type: 'REPLACE', status: 'PROCESSING', amountDelta: null }, items: [{ itemId: '8', equipmentId: '4', status: 'RETURNED', effect: 'REPLACE_OUT', active: true }], charges: [] })
   api.quoteAdjustment.mockRejectedValue(new Error('Availability changed'))
-  const wrapper = mount(RentalAdjustmentView)
+  const wrapper = mount(RentalAdjustmentView, sessionOptions(['3']))
   await wrapper.get('[aria-label="调整办理门店编号"]').setValue('3')
-  await wrapper.get('[aria-label="变更编号"]').setValue('9')
+  await wrapper.findAll('button').find(button => button.text() === '按变更编号查询')!.trigger('click')
+  await wrapper.get('input[inputmode="numeric"]').setValue('9')
   await wrapper.get('[data-test="load-adjustment"]').trigger('click')
   await flushPromises()
   wrapper.getComponent(EquipmentPicker).vm.$emit('selection', [{ equipmentId: '9007199254740993', currentDailyRate: '120.00' }])
@@ -36,9 +39,12 @@ it('AC-UC05 failed quote keeps incoming observed selection and committed return 
 
 it('AC-UC05 follow-up reduction explains that an existing return is not received twice', async () => {
   api.adjustment.mockResolvedValue({ change: { changeId: '10', contractId: '7', requestedStoreId: '3', type: 'REMOVE', status: 'SUBMITTED', amountDelta: null }, items: [{ itemId: '8', equipmentId: '4', status: 'RETURNED', effect: null, active: true }], charges: [] })
-  const wrapper = mount(RentalAdjustmentView)
+  const wrapper = mount(RentalAdjustmentView, sessionOptions(['3']))
   await wrapper.get('[aria-label="调整办理门店编号"]').setValue('3')
-  await wrapper.get('[aria-label="变更编号"]').setValue('10')
+  if (!wrapper.find('input[inputmode="numeric"]').exists()) {
+    await wrapper.findAll('button').find(button => button.text() === '按变更编号查询')!.trigger('click')
+  }
+  await wrapper.get('input[inputmode="numeric"]').setValue('10')
   await wrapper.get('[data-test="load-adjustment"]').trigger('click')
   await flushPromises()
   expect(wrapper.get('[data-test="follow-up-refund-help"]').text()).toContain('继续办理正式退款')
@@ -46,9 +52,10 @@ it('AC-UC05 follow-up reduction explains that an existing return is not received
 
 it('AC-UC05 zero-delta quote is frozen and does not offer another physical receipt', async () => {
   api.adjustment.mockResolvedValue({ change: { changeId: '9', contractId: '7', requestedStoreId: '3', type: 'REMOVE', status: 'PROCESSING', amountDelta: '0.00' }, items: [{ itemId: '8', equipmentId: '4', status: 'RENTED', effect: null, active: true }], charges: [] })
-  const wrapper = mount(RentalAdjustmentView)
+  const wrapper = mount(RentalAdjustmentView, sessionOptions(['3']))
   await wrapper.get('[aria-label="调整办理门店编号"]').setValue('3')
-  await wrapper.get('[aria-label="变更编号"]').setValue('9')
+  await wrapper.findAll('button').find(button => button.text() === '按变更编号查询')!.trigger('click')
+  await wrapper.get('input[inputmode="numeric"]').setValue('9')
   await wrapper.get('[data-test="load-adjustment"]').trigger('click')
   await flushPromises()
   expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
@@ -57,15 +64,19 @@ it('AC-UC05 zero-delta quote is frozen and does not offer another physical recei
 it('AC-UC05 switching adjustment clears a selected item from the previous quote', async () => {
   const detail = (changeId: string) => ({ change: { changeId, contractId: '7', requestedStoreId: '3', type: 'REPLACE', status: 'PROCESSING', amountDelta: null }, items: [{ itemId: '8', equipmentId: '4', status: 'RETURNED', effect: 'REPLACE_OUT', active: true }], charges: [] })
   api.adjustment.mockResolvedValueOnce(detail('9')).mockResolvedValueOnce(detail('10'))
-  const wrapper = mount(RentalAdjustmentView)
+  const wrapper = mount(RentalAdjustmentView, sessionOptions(['3']))
   await wrapper.get('[aria-label="调整办理门店编号"]').setValue('3')
-  await wrapper.get('[aria-label="变更编号"]').setValue('9')
+  await wrapper.findAll('button').find(button => button.text() === '按变更编号查询')!.trigger('click')
+  await wrapper.get('input[inputmode="numeric"]').setValue('9')
   await wrapper.get('[data-test="load-adjustment"]').trigger('click')
   await flushPromises()
   wrapper.getComponent(EquipmentPicker).vm.$emit('selection', [{ equipmentId: '99', currentDailyRate: '120.00' }])
   await wrapper.vm.$nextTick()
   expect(wrapper.get('[data-test="quote-adjustment"]').attributes('disabled')).toBeUndefined()
-  await wrapper.get('[aria-label="变更编号"]').setValue('10')
+  if (!wrapper.find('input[inputmode="numeric"]').exists()) {
+    await wrapper.findAll('button').find(button => button.text() === '按变更编号查询')!.trigger('click')
+  }
+  await wrapper.get('input[inputmode="numeric"]').setValue('10')
   await wrapper.get('[data-test="load-adjustment"]').trigger('click')
   await flushPromises()
   expect(wrapper.get('[data-test="quote-adjustment"]').attributes('disabled')).toBeDefined()

@@ -1,10 +1,16 @@
 <script setup lang="ts">
+import StoreSelect from '../identity/StoreSelect.vue'
 import { errorText } from '../../shared/presentation/zh'
 import { uiText } from '../../shared/presentation/zh'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useStoreOptions } from '../../shared/components/useStoreOptions'
 import { rentalApi, type ReturnReceipt } from './rentalApi'
 const storeId = ref('')
 const contractId = ref('')
+const manualContract = ref(false)
+const { options: contracts, loading: contractsLoading, error: contractsError } = useStoreOptions(storeId, rentalApi.list)
+const returnable = computed(() => contracts.value.filter(row => row.items.some(item => item.active && item.status === 'RENTED')))
+watch([storeId, manualContract], () => { contractId.value = '' })
 const receipt = ref<ReturnReceipt | null>(null)
 const selected = ref<string[]>([])
 const outcome = ref('NORMAL')
@@ -26,11 +32,50 @@ function receive() { return run(() => rentalApi.returns(contractId.value, storeI
 <template>
   <section>
     <h1>归还接收与检查</h1>
-    <p>请填写实际接收门店，可办理跨店归还。普通提前归还不自动退款。</p>
-    <label>接收门店编号<input v-model.trim="storeId"></label>
-    <label>合同编号<input v-model.trim="contractId"></label>
-    <button
+    <p>请选择实际接收门店，可办理跨店归还。普通提前归还不自动退款。</p>
+    <StoreSelect
+      v-model="storeId"
+      label="接收门店编号"
+      role="EMPLOYEE"
       :disabled="busy"
+    />
+    <label v-if="manualContract">合同编号<input
+      v-model.trim="contractId"
+      inputmode="numeric"
+      :disabled="busy"
+    ></label>
+    <label v-else>待归还合同<select
+      v-model="contractId"
+      aria-label="待归还合同"
+      :disabled="busy || contractsLoading || !returnable.length"
+    >
+      <option
+        value=""
+        disabled
+      >{{ contractsLoading ? '正在加载合同…' : returnable.length ? '选择合同' : '本店暂无待归还合同' }}</option>
+      <option
+        v-for="row in returnable"
+        :key="row.contractId"
+        :value="row.contractId"
+      >
+        {{ row.contractNumber }} · {{ row.rentalStartDate }} · {{ uiText(row.status) }}
+      </option>
+    </select></label>
+    <button
+      type="button"
+      :disabled="busy"
+      @click="manualContract = !manualContract"
+    >
+      {{ manualContract ? '返回本店合同列表' : '跨店或按合同编号查询' }}
+    </button>
+    <p
+      v-if="!manualContract && contractsError"
+      role="alert"
+    >
+      {{ contractsError }}
+    </p>
+    <button
+      :disabled="busy || !storeId || !contractId"
       @click="lookup"
     >
       查询归还所需信息

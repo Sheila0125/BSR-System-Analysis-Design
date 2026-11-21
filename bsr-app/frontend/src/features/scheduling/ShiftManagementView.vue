@@ -1,15 +1,18 @@
 <script setup lang="ts">
+import { useStoreOptions } from '../../shared/components/useStoreOptions'
+import StoreSelect from '../identity/StoreSelect.vue'
 import { errorText } from '../../shared/presentation/zh'
 import { uiText } from '../../shared/presentation/zh'
 import { computed, ref, watch } from 'vue'
 import { schedulingApi, type Shift, type ShiftInput } from './schedulingApi'
 import EmployeeContactEditor from './EmployeeContactEditor.vue'
-import { employeeChoices, type EmployeeChoice } from './employeeContactApi'
+import { employeeChoices } from './employeeContactApi'
 
 const storeId = ref('')
-const employees = ref<EmployeeChoice[]>([])
-watch(storeId, () => { employees.value = [] })
+const { options: employees, loading: employeesLoading, error: employeesError, refresh: refreshEmployees } =
+  useStoreOptions(storeId, employeeChoices)
 const employeeId = ref('')
+const manualEmployee = ref(false)
 const shiftDate = ref('')
 const startTime = ref('08:00')
 const endTime = ref('22:00')
@@ -20,7 +23,12 @@ const reasons = ref<Record<string, string>>({})
 const busy = ref(false)
 const error = ref('')
 const notice = ref('')
-const canSave = computed(() => Boolean(storeId.value && employeeId.value && shiftDate.value && startTime.value && endTime.value))
+watch(storeId, () => {
+  if (!selectedShiftId.value) employeeId.value = ''
+})
+const canSave = computed(() => Boolean(storeId.value && /^[1-9][0-9]{0,18}$/.test(employeeId.value)
+  && (manualEmployee.value || selectedShiftId.value || employees.value.some(row => row.employeeId === employeeId.value))
+  && shiftDate.value && startTime.value && endTime.value && !employeesLoading.value))
 
 async function run(operation: () => Promise<void>) {
   if (busy.value) return
@@ -42,9 +50,10 @@ function replace(updated: Shift) {
 
 function load() { return run(async () => {
   const requestedStoreId = storeId.value
-  const [rows, choices] = await Promise.all([schedulingApi.storeShifts(requestedStoreId), employeeChoices(requestedStoreId)])
+  refreshEmployees()
+  const rows = await schedulingApi.storeShifts(requestedStoreId)
   if (storeId.value !== requestedStoreId) return
-  shifts.value = rows; employees.value = choices
+  shifts.value = rows
   loadedStoreId.value = requestedStoreId
 }) }
 function save() { return run(async () => {
@@ -57,6 +66,7 @@ function save() { return run(async () => {
 }) }
 function edit(shift: Shift) {
   selectedShiftId.value = shift.shiftId
+  manualEmployee.value = false
   shiftDate.value = shift.shiftDate
   storeId.value = shift.storeId
   employeeId.value = shift.employeeId
@@ -86,10 +96,12 @@ function cancel(shiftId: string) { return run(async () => {
     >
       {{ notice }}
     </p>
-    <label>门店编号<input
-      v-model.trim="storeId"
-      aria-label="门店编号"
-    ></label>
+    <StoreSelect
+      v-model="storeId"
+      label="门店编号"
+      role="MANAGER"
+      :disabled="busy"
+    />
     <button
       data-testid="load-shifts"
       :disabled="busy || !storeId"
@@ -99,12 +111,26 @@ function cancel(shiftId: string) { return run(async () => {
     </button>
     <section>
       <h2>{{ selectedShiftId ? '调整班次' : '创建班次' }}</h2>
-      <label>员工编号<input
+      <label v-if="manualEmployee">员工编号<input
         v-model.trim="employeeId"
-        aria-label="员工编号"
-        list="scheduling-employee-options"
+        inputmode="numeric"
+        :disabled="busy"
       ></label>
-      <datalist id="scheduling-employee-options">
+      <label v-else>员工<select
+        v-model="employeeId"
+        aria-label="员工"
+        :disabled="busy || employeesLoading"
+      >
+        <option
+          value=""
+          disabled
+        >{{ employeesLoading ? '正在加载员工…' : employees.length ? '选择员工' : '本店暂无员工候选' }}</option>
+        <option
+          v-if="selectedShiftId && employeeId && !employees.some(row => row.employeeId === employeeId)"
+          :value="employeeId"
+        >
+          当前班次员工 · {{ employeeId }}
+        </option>
         <option
           v-for="employee in employees"
           :key="employee.employeeId"
@@ -112,9 +138,19 @@ function cancel(shiftId: string) { return run(async () => {
         >
           {{ employee.employeeNumber }} · {{ employee.fullName }}
         </option>
-      </datalist>
-      <p v-if="employees.length">
-        候选来自当前门店有效授权员工，提交时仍会校验在职状态和同日班次冲突。
+      </select></label>
+      <button
+        type="button"
+        :disabled="busy || !storeId"
+        @click="manualEmployee = !manualEmployee"
+      >
+        {{ manualEmployee ? '返回本店员工列表' : '按员工编号办理' }}
+      </button>
+      <p
+        v-if="!manualEmployee && employeesError"
+        role="alert"
+      >
+        {{ employeesError }}
       </p>
       <label>排班日期<input
         v-model="shiftDate"

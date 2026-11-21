@@ -1,3 +1,4 @@
+import { sessionOptions } from '../../../tests/unit/sessionOptions'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, expect, it, vi } from 'vitest'
 import TransferHandoffView from './TransferHandoffView.vue'
@@ -9,7 +10,7 @@ beforeEach(() => { vi.clearAllMocks(); api.listTransfers.mockResolvedValue([tran
 
 it('AC-BR29/AC-BR31 submits one source-store item and displays only that result', async () => {
   api.dispatch.mockResolvedValue({ ...transfer, status: 'IN_TRANSIT', items: [{ ...transfer.items[0], dispatchResult: 'DISPATCHED' }] })
-  const wrapper = mount(TransferHandoffView)
+  const wrapper = mount(TransferHandoffView, sessionOptions(['11', '12']))
   await wrapper.get('[aria-label="交接门店编号"]').setValue('11')
   await wrapper.get('[data-testid="load-handoffs"]').trigger('click')
   await flushPromises()
@@ -23,7 +24,7 @@ it('AC-BR30/AC-BR31 receives at destination and keeps exception note after a fai
   api.listTransfers.mockResolvedValue([{ ...transfer, items: [{ ...transfer.items[0], dispatchResult: 'DISPATCHED' }] }])
   api.reportException.mockRejectedValue(new Error('Receipt conflict'))
   api.receive.mockResolvedValue({ ...transfer, status: 'COMPLETED', items: [{ ...transfer.items[0], dispatchResult: 'DISPATCHED', receiptResult: 'RECEIVED' }] })
-  const wrapper = mount(TransferHandoffView)
+  const wrapper = mount(TransferHandoffView, sessionOptions(['11', '12']))
   await wrapper.get('[aria-label="交接门店编号"]').setValue('12')
   await wrapper.get('[data-testid="load-handoffs"]').trigger('click')
   await flushPromises()

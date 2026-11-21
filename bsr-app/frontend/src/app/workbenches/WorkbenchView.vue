@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { errorText } from '../../shared/presentation/zh'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import SkiIcon from '../../shared/components/SkiIcon.vue'
 import { uiText } from '../../shared/presentation/zh'
 import { currentActor, type CurrentActor } from '../../features/identity/authApi'
+import { storeChoicesKey } from '../../features/identity/sessionStores'
 import { deactivateStore, operations, type OperationsState } from './operationsApi'
 
 const props = defineProps<{ mode: 'employee' | 'manager' }>()
@@ -21,6 +22,11 @@ const grants = computed(() => actor.value?.identityType === 'EMPLOYEE'
   ? actor.value.grants.filter(grant => grant.role === (props.mode === 'manager' ? 'MANAGER' : 'EMPLOYEE') && grant.storeId)
   : [])
 const stores = computed(() => [...new Set(grants.value.map(grant => grant.storeId as string))])
+const storeChoices = inject(storeChoicesKey, null)
+function storeLabel(id: string) {
+  const store = storeChoices?.value.find(choice => choice.storeId === id)
+  return store ? `${store.storeName} · ${store.storeNumber}` : `门店 · ${id}`
+}
 const links = computed(() => props.mode === 'employee' ? [
   { label: '租赁需求', to: '/customer-requests/employee-queue' },
   { label: '顾客核验', to: '/customer-requests/verify-customer' },
@@ -131,7 +137,7 @@ function linkIcon(to: string) {
             :key="store"
             :value="store"
           >
-            门店 · {{ store }}
+            {{ storeLabel(store) }}
           </option>
         </select>
         <button

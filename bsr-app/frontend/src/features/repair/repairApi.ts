@@ -22,6 +22,7 @@ export interface RepairContractor {
   contractorId: string; number: string; name: string; contactName: string | null
   email: string; phone: string | null; active: boolean; postalAddress?: string | null
 }
+export type ContractorChoice = Pick<RepairContractor, 'contractorId' | 'number' | 'name'>
 export interface RepairRate {
   rateId: string; contractorId: string; effectiveFrom: string
   effectiveTo: string | null; hourlyRate: string
@@ -77,6 +78,7 @@ export const repairApi = {
     post<RepairLabor>(`/api/repair-tasks/mine/${id(taskId)}/labor`, { repairDate, durationHours, handlingResult, note }),
   submit: (taskId: string) => post<RepairTask>(`/api/repair-tasks/mine/${id(taskId)}/submit`),
   contractors: (storeId: string) => get<RepairContractor[]>(`/api/repair-contractors?storeId=${id(storeId)}`),
+  assignmentChoices: (storeId: string) => get<ContractorChoice[]>(`/api/repair-contractors/assignment-choices?storeId=${id(storeId)}`),
   createContractor: (storeId: string, name: string, contactName: string | null, email: string, phone: string | null, postalAddress?: string) =>
     post<RepairContractor>('/api/repair-contractors', { storeId: id(storeId), name, contactName, email, phone, postalAddress }),
   updateContractor: (storeId: string, contractorId: string, name: string, contactName: string | null, email: string, phone: string | null, postalAddress?: string) =>

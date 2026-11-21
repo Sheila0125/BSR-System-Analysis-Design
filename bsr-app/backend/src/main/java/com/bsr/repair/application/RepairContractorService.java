@@ -109,6 +109,12 @@ public class RepairContractorService {
     }
 
     @Transactional(readOnly = true)
+    public List<RepairViews.Contractor> assignmentChoices(ActorContext actor, long storeId) {
+        authorization.require(actor, ActionPermission.EMPLOYEE_REPAIR_PROCESS, storeId);
+        return management.listContractors().stream().filter(RepairViews.Contractor::active).toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<RepairViews.Rate> rates(ActorContext actor, long storeId, long contractorId) {
         requireManager(actor, storeId);
         if (management.findContractor(contractorId).isEmpty()) {
