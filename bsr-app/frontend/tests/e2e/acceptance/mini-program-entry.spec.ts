@@ -21,7 +21,7 @@ test('AC-WX05 public entry explains missing code and displays only a configured 
         const code = page.getByRole('img', { name: '官方顾客小程序码' })
         if (configuredImage) {
           await expect(code).toHaveAttribute('src', configuredImage)
-          await expect(page.getByText('请用微信扫描下方小程序码')).toBeVisible()
+          await expect(page.getByText('请用微信扫描小程序码，进入顾客端。')).toBeVisible()
         } else {
           await expect(code).toHaveCount(0)
           await expect(page.getByText('顾客小程序码暂未配置')).toBeVisible()

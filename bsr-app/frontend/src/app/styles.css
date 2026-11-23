@@ -182,7 +182,7 @@ a{color:inherit;
   height:252px;
   border-radius:14px;
   overflow:hidden;
-  background-image:linear-gradient(90deg,rgba(11,37,65,.65),rgba(14,42,69,.12) 63%,transparent),url('../assets/ski-hero.png');
+  background-image:linear-gradient(90deg,rgba(11,37,65,.65),rgba(14,42,69,.12) 63%,transparent),url('../assets/ski-hero.webp');
   background-position:center 54%;
   background-size:cover;
   box-shadow:0 9px 23px #173b5f0c}
@@ -390,7 +390,7 @@ a{color:inherit;
   letter-spacing:.3px}
 .login-page{height:100vh;
   min-height:720px;
-  background:linear-gradient(90deg,#092a4d73,#16395712 70%),url('../assets/ski-hero.png') center/cover no-repeat;
+  background:linear-gradient(90deg,#092a4d73,#16395712 70%),url('../assets/ski-hero.webp') center/cover no-repeat;
   color:#fff}
 .login-top{height:100px;
   padding:0 65px;

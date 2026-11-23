@@ -20,6 +20,7 @@ describe('AC-WX05 configured mini-program entry', () => {
     vi.stubEnv('VITE_MINIPROGRAM_QR_IMAGE', '/assets/bsr-miniprogram-code.png')
     const wrapper = mount(MiniProgramEntryView)
     expect(wrapper.get('img').attributes('src')).toBe('/assets/bsr-miniprogram-code.png')
+    expect(wrapper.text()).not.toContain('打开调试')
     expect(wrapper.find('canvas').exists()).toBe(false)
     expect(wrapper.find('button').exists()).toBe(false)
   })
@@ -36,6 +37,8 @@ describe('AC-WX05 configured mini-program entry', () => {
     const wrapper = mount(MiniProgramEntryView)
     expect(wrapper.get('img').attributes('src')).toBe(trialCode)
     expect(wrapper.text()).toContain('11 月 28 日前有效')
+    expect(wrapper.text()).toContain('打开调试')
+    expect(wrapper.text()).toContain('顾客账号')
   })
 
   it('hides the built-in trial code at its Beijing-time deadline', () => {
@@ -43,6 +46,7 @@ describe('AC-WX05 configured mini-program entry', () => {
     vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-28T00:00:00+08:00'))
     const wrapper = mount(MiniProgramEntryView)
     expect(wrapper.text()).toContain('暂未配置')
+    expect(wrapper.text()).toContain('已到期')
     expect(wrapper.find('img').exists()).toBe(false)
   })
 })
