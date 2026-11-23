@@ -30,6 +30,16 @@ const pending = {
 beforeEach(() => vi.clearAllMocks())
 
 describe('AC-UC04/AC-BR05 EmployeeRequestQueueView', () => {
+  it('automatically loads the selected store and shows the newest application first', async () => {
+    apiMocks.loadEmployeeRentalRequests.mockResolvedValue([
+      pending, { ...pending, requestId: '93', requestNumber: 'REQ-NEW', submittedAt: '2026-11-23T14:12:12' },
+    ])
+    const wrapper = mount(EmployeeRequestQueueView, sessionOptions(['3', '4']))
+    await wrapper.get('select[aria-label="门店编号"]').setValue('3')
+    await flushPromises()
+    expect(apiMocks.loadEmployeeRentalRequests).toHaveBeenCalledWith('3')
+    expect(wrapper.findAll('.request-card h2').map(el => el.text())).toEqual(['REQ-NEW', 'REQ-91'])
+  })
   it('loads one store and applies only the server-confirmed semantic action', async () => {
     apiMocks.loadEmployeeRentalRequests.mockResolvedValue([pending])
     apiMocks.acceptRentalRequest.mockResolvedValue({

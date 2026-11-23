@@ -2,15 +2,19 @@
 import StoreSelect from '../identity/StoreSelect.vue'
 import { errorText } from '../../shared/presentation/zh'
 import { uiText } from '../../shared/presentation/zh'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useStoreOptions } from '../../shared/components/useStoreOptions'
 import EquipmentPicker from '../equipment/EquipmentPicker.vue'
 import ChargeTransactions from './ChargeTransactions.vue'
+import ContractCards from './ContractCards.vue'
+import { loadCatalog } from '../equipment/equipmentCatalogApi'
 import type { AvailableEquipment } from '../equipment/equipmentAvailabilityApi'
 import { rentalApi, type Adjustment, type ChangeRequest } from './rentalApi'
 
 const storeId = ref(''), contractId = ref(''), changeId = ref(''), type = ref('REPLACE')
 const { options: contracts, loading: contractsLoading, error: contractsError } = useStoreOptions(storeId, rentalApi.list)
+const { options: catalog } = useStoreOptions(storeId, id => loadCatalog(id, '', ''))
+const categories = computed(() => new Map(catalog.value.map(item => [item.equipmentId, item.equipmentCategory])))
 const manualContract = ref(false), manualChange = ref(false)
 const detail = ref<Adjustment | null>(null), queue = ref<ChangeRequest[]>([])
 const selection = ref<AvailableEquipment[]>([]), returned = ref<string[]>([]), issued = ref<string[]>([])
@@ -92,23 +96,21 @@ function issue() { return run(async () => {
       inputmode="numeric"
       :disabled="busy"
     ></label>
-    <label v-else>合同<select
-      v-model="contractId"
-      aria-label="合同"
-      :disabled="busy || contractsLoading || !contracts.length"
+    <ContractCards
+      v-else-if="contracts.length"
+      :key="storeId"
+      label="需调整的合同"
+      :contracts="contracts"
+      :categories="categories"
+      :selected-id="contractId"
+      :disabled="busy || contractsLoading"
+      @select="contractId = $event.contractId"
+    />
+    <p
+      v-else-if="storeId && !contractsError"
     >
-      <option
-        value=""
-        disabled
-      >{{ contractsLoading ? '正在加载合同…' : contracts.length ? '选择合同' : '本店暂无合同' }}</option>
-      <option
-        v-for="row in contracts"
-        :key="row.contractId"
-        :value="row.contractId"
-      >
-        {{ row.contractNumber }} · {{ uiText(row.status) }}
-      </option>
-    </select></label>
+      {{ contractsLoading ? '正在加载合同…' : '本店暂无合同' }}
+    </p>
     <button
       type="button"
       :disabled="busy"

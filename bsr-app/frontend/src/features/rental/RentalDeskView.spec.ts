@@ -86,7 +86,7 @@ it('AC-UC04 shows the pricing basis and exact server amounts without repricing h
   await wrapper.get('[aria-label="门店编号"]').setValue('3')
   await wrapper.findAll('button').find(b => b.text() === '查询合同与变更需求')?.trigger('click')
   await flushPromises()
-  await wrapper.get('select:has(option[value="7"])').setValue('7')
+  await wrapper.get('[data-test="contract-7"]').trigger('click')
   const article = wrapper.get('article')
   expect(article.text()).toContain('合同应付合计 418.50')
   expect(article.text()).toContain('日租金快照 99.50 / 天')
@@ -126,7 +126,7 @@ it('AC-UC04 failed draft revision retains old item and replacement selection', a
   await wrapper.get('[aria-label="门店编号"]').setValue('3')
   await wrapper.findAll('button').find(b => b.text() === '查询合同与变更需求')?.trigger('click')
   await flushPromises()
-  await wrapper.get('select:has(option[value="7"])').setValue('7')
+  await wrapper.get('[data-test="contract-7"]').trigger('click')
   await flushPromises()
   expect(wrapper.get('article ul').text()).toContain('Atomic Redster · 双板 · INV-SKI-04')
   await wrapper.get('input[type="checkbox"]').setValue(true)
@@ -146,15 +146,15 @@ it('AC-UC04 switching contracts clears an observed replacement from the previous
   await wrapper.get('[aria-label="门店编号"]').setValue('3')
   await wrapper.findAll('button').find(b => b.text() === '查询合同与变更需求')?.trigger('click')
   await flushPromises()
-  await wrapper.get('select:has(option[value="7"])').setValue('7')
+  await wrapper.get('[data-test="contract-7"]').trigger('click')
   wrapper.getComponent(EquipmentPicker).vm.$emit('selection', [{ equipmentId: '9', currentDailyRate: '120.00' }])
   await wrapper.vm.$nextTick()
-  await wrapper.get('select:has(option[value="8"])').setValue('8')
+  await wrapper.get('[data-test="contract-8"]').trigger('click')
   await wrapper.get('input[type="checkbox"]').setValue(true)
   expect(wrapper.findAll('button').find(b => b.text().startsWith('替换所选草稿雪具'))?.attributes('disabled')).toBeDefined()
 })
 it('loads the only unsettled fee and automatically shows its existing simulated receipt and remaining balance', async () => {
-  api.list.mockResolvedValue([{ contractId: '7', contractNumber: 'RC-7', status: 'PENDING_PAYMENT', customerId: '2', rentalDays: 1, amountDue: '100.00', items: [],
+  api.list.mockResolvedValue([{ contractId: '7', contractNumber: 'RC-7', status: 'PENDING_PAYMENT', customerId: '2', rentalStartDate: '2026-12-20', rentalDays: 1, amountDue: '100.00', items: [],
     charges: [{ chargeId: '11', type: 'INITIAL', amount: '100.00', status: 'PENDING' }] }])
   api.changes.mockResolvedValue([])
   api.transactions.mockResolvedValue([
@@ -165,11 +165,29 @@ it('loads the only unsettled fee and automatically shows its existing simulated 
   await wrapper.get('[aria-label="门店编号"]').setValue('3')
   await wrapper.findAll('button').find(button => button.text() === '查询合同与变更需求')!.trigger('click')
   await flushPromises()
-  await wrapper.get('[aria-label="门店合同"]').setValue('7')
+  await wrapper.get('[data-test="contract-7"]').trigger('click')
   await flushPromises()
 
   expect(api.transactions).toHaveBeenCalledWith('11')
   expect(wrapper.text()).toContain('SIM-TEST-1')
   expect(wrapper.get<HTMLInputElement>('[aria-label="金额"]').element.value).toBe('69.99')
   expect(wrapper.get<HTMLInputElement>('[aria-label="外部交易编号"]').element.value).toBe('')
+})
+
+it('automatically opens a sole current contract and uses equipment keywords on its card', async () => {
+  api.list.mockResolvedValue([{
+    contractId: '7', contractNumber: 'RC-REFERENCE', status: 'ACTIVE', customerId: '2', serviceStoreId: '3',
+    rentalStartDate: '2026-12-20', rentalDays: 1, amountDue: '100.00', charges: [],
+    items: [{ itemId: '8', equipmentId: '4', dailyRateSnapshot: '100.00', status: 'RENTED', active: true }],
+  }])
+  api.changes.mockResolvedValue([])
+  const wrapper = mount(RentalDeskView, sessionOptions(['3']))
+  await flushPromises()
+  await wrapper.findAll('button').find(button => button.text() === '查询合同与变更需求')!.trigger('click')
+  await flushPromises()
+  const card = wrapper.get('[data-test="contract-7"]')
+  expect(card.text()).toContain('双板')
+  expect(card.text()).not.toContain('RC-REFERENCE')
+  expect(card.attributes('aria-pressed')).toBe('true')
+  expect(wrapper.get('article').text()).toContain('RC-REFERENCE')
 })

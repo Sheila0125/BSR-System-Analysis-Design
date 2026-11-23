@@ -2,8 +2,9 @@
 import StoreSelect from '../identity/StoreSelect.vue'
 import { problemText } from '../../shared/presentation/zh'
 import { uiText } from '../../shared/presentation/zh'
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ApiError } from '../../shared/http/apiClient'
+import { useStoreOptions } from '../../shared/components/useStoreOptions'
 import {
   acceptRentalRequest,
   loadEmployeeRentalRequests,
@@ -13,17 +14,18 @@ import {
 } from './employeeRequestApi'
 
 const storeId = ref('')
-const requests = ref<EmployeeRentalRequest[]>([])
-const loaded = ref(false)
-const loading = ref(false)
+const { options: requests, loading, error: queueError, refresh } = useStoreOptions(storeId, loadEmployeeRentalRequests)
+const newestFirst = computed(() => [...requests.value].reverse())
 const processingId = ref('')
 const errorMessage = ref('')
 const successMessage = ref('')
 const reasonById = ref<Record<string, string>>({})
 
-function positiveId(value: string): boolean {
-  return /^[1-9]\d*$/.test(value)
-}
+watch(storeId, () => {
+  reasonById.value = {}
+  successMessage.value = ''
+  errorMessage.value = ''
+})
 
 function describeError(error: unknown): string {
   return error instanceof ApiError
@@ -31,23 +33,10 @@ function describeError(error: unknown): string {
     : '请求失败，请检查连接后重试。'
 }
 
-async function loadQueue() {
+function loadQueue() {
   errorMessage.value = ''
   successMessage.value = ''
-  if (!positiveId(storeId.value)) {
-    errorMessage.value = '请输入有效的正整数门店编号。'
-    return
-  }
-  loading.value = true
-  loaded.value = false
-  try {
-    requests.value = await loadEmployeeRentalRequests(storeId.value)
-    loaded.value = true
-  } catch (error) {
-    errorMessage.value = describeError(error)
-  } finally {
-    loading.value = false
-  }
+  if (storeId.value && !loading.value && !processingId.value) refresh()
 }
 
 async function process(
@@ -90,7 +79,7 @@ async function requestSupplement(request: EmployeeRentalRequest) {
       员工业务
     </p>
     <h1>租赁需求队列</h1>
-    <p>查看授权门店的租赁需求，核对顾客信息后受理或要求补充资料。</p>
+    <p>顾客新提交的申请会出现在这里。选门店后自动加载，最新的申请排在最前。</p>
 
     <form
       class="queue-search"
@@ -100,21 +89,21 @@ async function requestSupplement(request: EmployeeRentalRequest) {
         v-model="storeId"
         label="门店编号"
         role="EMPLOYEE"
-        :disabled="loading"
+        :disabled="!!processingId"
       />
       <button
         type="submit"
-        :disabled="loading"
+        :disabled="!storeId || loading || !!processingId"
       >
-        {{ loading ? '加载中…' : '查询需求' }}
+        {{ loading ? '加载中…' : '刷新需求' }}
       </button>
     </form>
 
     <p
-      v-if="errorMessage"
+      v-if="errorMessage || queueError"
       role="alert"
     >
-      {{ errorMessage }}
+      {{ errorMessage || queueError }}
     </p>
     <p
       v-if="successMessage"
@@ -123,14 +112,14 @@ async function requestSupplement(request: EmployeeRentalRequest) {
       {{ successMessage }}
     </p>
     <p
-      v-if="loaded && requests.length === 0"
+      v-if="storeId && !loading && !queueError && !requests.length"
       class="empty-state"
     >
       该门店暂无待处理的租赁需求。
     </p>
 
     <article
-      v-for="request in requests"
+      v-for="request in newestFirst"
       :key="request.requestId"
       class="request-card"
     >
@@ -186,7 +175,7 @@ async function requestSupplement(request: EmployeeRentalRequest) {
         <button
           v-if="request.status === 'PENDING'"
           type="button"
-          :disabled="processingId === request.requestId"
+          :disabled="loading || !!processingId"
           @click="requestSupplement(request)"
         >
           要求补充资料
@@ -194,7 +183,7 @@ async function requestSupplement(request: EmployeeRentalRequest) {
         <button
           v-if="request.status === 'PENDING'"
           type="button"
-          :disabled="processingId === request.requestId"
+          :disabled="loading || !!processingId"
           @click="process(request, acceptRentalRequest, '已受理')"
         >
           受理需求
@@ -202,7 +191,7 @@ async function requestSupplement(request: EmployeeRentalRequest) {
         <button
           v-if="request.status === 'PENDING' || request.status === 'ACCEPTED'"
           type="button"
-          :disabled="processingId === request.requestId"
+          :disabled="loading || !!processingId"
           @click="process(request, markRentalRequestUnavailable, '已标记无法满足')"
         >
           无法满足

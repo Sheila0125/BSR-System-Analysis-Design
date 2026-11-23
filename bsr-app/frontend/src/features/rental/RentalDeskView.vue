@@ -10,6 +10,8 @@ import { loadCatalog } from '../equipment/equipmentCatalogApi'
 import { conciseEquipmentName } from '../equipment/equipmentDisplay'
 import RentalInvoice from './RentalInvoice.vue'
 import ChargeTransactions from './ChargeTransactions.vue'
+import ContractCards from './ContractCards.vue'
+import { contractKeywords } from './contractKeywords'
 import type { AvailableEquipment } from '../equipment/equipmentAvailabilityApi'
 import { rentalApi, type Contract, type ChangeRequest } from './rentalApi'
 
@@ -31,9 +33,9 @@ const invoiceVersion = ref(0)
 const pickerGeneration = ref(0)
 const replacementGeneration = ref(0)
 const issuableIds = computed(() => contract.value?.items.filter(item => item.active && item.status === 'PENDING_ISSUE').map(item => item.itemId) ?? [])
-const contractStore = computed(() => contract.value ? storeId.value : '')
-const { options: catalog } = useStoreOptions(contractStore, id => loadCatalog(id, '', ''))
+const { options: catalog } = useStoreOptions(storeId, id => loadCatalog(id, '', ''))
 const equipmentById = computed(() => new Map(catalog.value.map(item => [item.equipmentId, item])))
+const categories = computed(() => new Map(catalog.value.map(item => [item.equipmentId, item.equipmentCategory])))
 const selectedRequest = computed(() => requests.value.find(row => row.requestId === sourceRequestId.value) ?? null)
 const requestRequirements = computed(() => {
   const counts = new Map<string, number>()
@@ -76,12 +78,11 @@ function load() { return run(async () => {
   const [listedContracts, listedChanges] = await Promise.all([rentalApi.list(storeId.value), rentalApi.changes(storeId.value)])
   contracts.value = listedContracts
   changes.value = listedChanges
+  const current = listedContracts.filter(row => !['ENDED', 'CANCELLED'].includes(row.status))
+  if (!contract.value && (current.length === 1 || listedContracts.length === 1)) {
+    selectContract(current[0] ?? listedContracts[0]!)
+  }
 }) }
-function pickContract(event: Event) {
-  const id = (event.target as HTMLSelectElement).value
-  const chosen = contracts.value.find(row => row.contractId === id)
-  if (chosen) selectContract(chosen)
-}
 function selectRequest(requestId: string) {
   if (sourceRequestId.value === requestId) return
   sourceRequestId.value = requestId
@@ -143,7 +144,9 @@ function action(kind: 'submit' | 'cancel' | 'issue') { return run(async () => {
       v-else-if="!requests.length"
       class="empty-state"
     >
-      暂无已受理需求
+      暂无已受理需求。新申请请先到 <RouterLink to="/customer-requests/employee-queue">
+        租赁需求
+      </RouterLink> 处理。
     </p>
     <div
       v-else
@@ -236,26 +239,19 @@ function action(kind: 'submit' | 'cancel' | 'issue') { return run(async () => {
     >
       创建合同草稿
     </button>
-    <label v-if="contracts.length">门店合同<select
-      :value="contract?.contractId ?? ''"
-      aria-label="门店合同"
+    <ContractCards
+      v-if="contracts.length"
+      :key="storeId"
+      label="门店合同"
+      :contracts="contracts"
+      :categories="categories"
+      :selected-id="contract?.contractId"
       :disabled="busy"
-      @change="pickContract"
-    >
-      <option
-        value=""
-        disabled
-      >选择合同</option>
-      <option
-        v-for="c in contracts"
-        :key="c.contractId"
-        :value="c.contractId"
-      >
-        {{ c.contractNumber }} · {{ uiText(c.status) }} · {{ c.amountDue }} NOK
-      </option>
-    </select></label>
+      @select="selectContract"
+    />
     <article v-if="contract">
-      <h2>{{ contract.contractNumber }} · {{ uiText(contract.status) }}</h2>
+      <h2>{{ contractKeywords(contract, categories) }} · {{ uiText(contract.status) }}</h2>
+      <p>合同编号 {{ contract.contractNumber }}</p>
       <p>顾客 {{ contract.customerId }} · {{ contract.rentalStartDate }} · {{ contract.rentalDays }} 整日 · 合同应付合计 {{ contract.amountDue }}</p>
       <button
         type="button"

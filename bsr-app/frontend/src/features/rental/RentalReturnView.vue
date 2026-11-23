@@ -4,13 +4,22 @@ import { errorText } from '../../shared/presentation/zh'
 import { uiText } from '../../shared/presentation/zh'
 import { computed, ref, watch } from 'vue'
 import { useStoreOptions } from '../../shared/components/useStoreOptions'
+import { loadCatalog } from '../equipment/equipmentCatalogApi'
+import ContractCards from './ContractCards.vue'
+import { contractKeywords } from './contractKeywords'
 import { rentalApi, type ReturnReceipt } from './rentalApi'
 const storeId = ref('')
 const contractId = ref('')
 const manualContract = ref(false)
 const { options: contracts, loading: contractsLoading, error: contractsError } = useStoreOptions(storeId, rentalApi.list)
 const returnable = computed(() => contracts.value.filter(row => row.items.some(item => item.active && item.status === 'RENTED')))
+const { options: catalog } = useStoreOptions(storeId, id => loadCatalog(id, '', ''))
+const categories = computed(() => new Map(catalog.value.map(item => [item.equipmentId, item.equipmentCategory])))
+const selectedContract = computed(() => contracts.value.find(row => row.contractId === contractId.value))
 watch([storeId, manualContract], () => { contractId.value = '' })
+watch([returnable, manualContract], ([options, manual]) => {
+  if (!manual && !contractId.value && options.length === 1) contractId.value = options[0]!.contractId
+})
 const receipt = ref<ReturnReceipt | null>(null)
 const selected = ref<string[]>([])
 const returnableItems = computed(() => receipt.value?.items.filter(item => item.status === 'RENTED') ?? [])
@@ -61,23 +70,21 @@ function receive() { return run(async () => {
       inputmode="numeric"
       :disabled="busy"
     ></label>
-    <label v-else>待归还合同<select
-      v-model="contractId"
-      aria-label="待归还合同"
-      :disabled="busy || contractsLoading || !returnable.length"
+    <ContractCards
+      v-else-if="returnable.length"
+      :key="storeId"
+      label="待归还合同"
+      :contracts="returnable"
+      :categories="categories"
+      :selected-id="contractId"
+      :disabled="busy || contractsLoading"
+      @select="contractId = $event.contractId"
+    />
+    <p
+      v-else-if="storeId && !contractsError"
     >
-      <option
-        value=""
-        disabled
-      >{{ contractsLoading ? '正在加载合同…' : returnable.length ? '选择合同' : '本店暂无待归还合同' }}</option>
-      <option
-        v-for="row in returnable"
-        :key="row.contractId"
-        :value="row.contractId"
-      >
-        {{ row.contractNumber }} · {{ row.rentalStartDate }} · {{ uiText(row.status) }}
-      </option>
-    </select></label>
+      {{ contractsLoading ? '正在加载合同…' : '本店暂无待归还合同' }}
+    </p>
     <button
       type="button"
       :disabled="busy"
@@ -104,7 +111,8 @@ function receive() { return run(async () => {
       {{ error }}
     </p>
     <article v-if="receipt">
-      <h2>合同 {{ receipt.contractId }} · {{ uiText(receipt.status) }}</h2>
+      <h2>{{ selectedContract ? contractKeywords(selectedContract, categories) : '归还清单' }} · {{ uiText(receipt.status) }}</h2>
+      <p>合同编号 {{ selectedContract?.contractNumber ?? receipt.contractId }}</p>
       <ul>
         <li
           v-for="i in receipt.items"

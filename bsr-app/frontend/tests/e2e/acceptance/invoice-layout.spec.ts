@@ -21,7 +21,7 @@ test('staff can open the invoice with readable balances and long identifiers at 
   await page.goto('/rental/desk')
   await page.getByLabel('门店编号',{exact:true}).selectOption('1')
   await page.getByRole('button',{name:'查询合同与变更需求',exact:true}).click()
-  await page.getByLabel('门店合同').selectOption('7')
+  await page.locator('[data-test="contract-7"]').click()
   await page.getByRole('button',{name:'查看发票与付款凭证',exact:true}).click()
   const invoicePanel=page.getByRole('region',{name:'电子发票',exact:true})
   await expect(invoicePanel.getByTestId('invoice-outstanding')).toContainText('318.50')

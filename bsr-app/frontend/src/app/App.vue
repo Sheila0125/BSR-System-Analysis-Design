@@ -2,7 +2,7 @@
 import { computed, provide, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { currentActor, type CurrentActor } from '../features/identity/authApi'
-import { loadStoreChoices, sessionActorKey, storeChoicesKey } from '../features/identity/sessionStores'
+import { loadStoreChoices, sessionActorKey, storeChoicesKey, storeChoicesStatusKey } from '../features/identity/sessionStores'
 import { featureMenuItems } from './routing/featureRegistry'
 import { authorizedMenu } from './routing/authorizedNavigation'
 import SkiIcon from '../shared/components/SkiIcon.vue'
@@ -11,8 +11,11 @@ import { uiText } from '../shared/presentation/zh'
 const route = useRoute()
 const actor = ref<CurrentActor | null>(null)
 const storeChoices = ref<Awaited<ReturnType<typeof loadStoreChoices>>>([])
+const storeChoicesStatus = ref<'loading' | 'ready' | 'error'>('loading')
+const storeChoicesRevision = ref(0)
 provide(sessionActorKey, actor)
 provide(storeChoicesKey, storeChoices)
+provide(storeChoicesStatusKey, { status: storeChoicesStatus, retry: () => { storeChoicesRevision.value++ } })
 const menuOpen = ref(false)
 const menuItems = computed(() => authorizedMenu(actor.value, featureMenuItems))
 const isLogin = computed(() => route.fullPath.split('?')[0] === '/identity/login')
@@ -46,21 +49,30 @@ function iconFor(path: string) {
   return 'file'
 }
 let requestVersion = 0
-watch(() => {
+const storeScope = computed(() => {
   const current = actor.value
   const ids = current?.grants.flatMap(grant => grant.storeId ? [grant.storeId] : []).sort()
   return ids?.length ? JSON.stringify([current?.accountId, ids]) : ''
-}, async (scope, _previous, onCleanup) => {
-  storeChoices.value = []
+})
+watch([storeScope, storeChoicesRevision], async ([scope], [previousScope], onCleanup) => {
+  if (scope !== previousScope) storeChoices.value = []
   if (!scope) return
+  storeChoicesStatus.value = 'loading'
   let current = true
   onCleanup(() => { current = false })
-  try {
-    const choices = await loadStoreChoices()
-    if (current) storeChoices.value = choices
-  } catch {
-    // Store IDs from the session remain available if names cannot be loaded.
+  for (let attempt = 0; attempt < 2 && current; attempt++) {
+    try {
+      const choices = await loadStoreChoices()
+      if (current) {
+        storeChoices.value = choices
+        storeChoicesStatus.value = 'ready'
+      }
+      return
+    } catch {
+      if (attempt === 0 && current) await new Promise(resolve => setTimeout(resolve, 550))
+    }
   }
+  if (current) storeChoicesStatus.value = 'error'
 })
 watch(() => route.fullPath, async () => {
   menuOpen.value = false

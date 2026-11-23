@@ -4,6 +4,7 @@ test.use({ launchOptions: { executablePath: process.env.BSR_E2E_BROWSER_EXECUTAB
 
 test('staff can select and remove several long equipment entries at phone width', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
+  let storeReads = 0
   await page.route('**/api/**', async route => {
     const path = new URL(route.request().url()).pathname
     if (path === '/api/auth/me') {
@@ -16,14 +17,19 @@ test('staff can select and remove several long equipment entries at phone width'
         { requestId: '8', requestNumber: 'RQ-WAIT', status: 'PENDING' },
       ] })
     } else if (path === '/api/stores/choices') {
-      await route.fulfill({ json: [{ storeId: '1', storeName: '雪场门店', storeNumber: 'NORTH' }] })
+      if (++storeReads === 1) {
+        await route.fulfill({ status: 503, json: { detail: 'Temporary store-name lookup failure' } })
+      } else {
+        await route.fulfill({ json: [{ storeId: '1', storeName: '雪场门店', storeNumber: 'NORTH' }] })
+      }
     } else {
       await route.fulfill({ status: 500, json: { detail: 'Unexpected endpoint in isolated layout test' } })
     }
   })
   await page.goto('/rental/desk')
   await page.getByLabel('门店编号', { exact: true }).selectOption('1')
-  await expect(page.getByLabel('门店编号')).toContainText('雪场门店 · NORTH')
+  await expect(page.getByLabel('门店编号')).toContainText('雪场门店')
+  expect(storeReads).toBe(2)
   const requests = page.getByLabel('已受理需求')
   await page.getByRole('button', { name: '选择需求 RQ-READY' }).click()
   await expect(requests).not.toContainText('RQ-WAIT')
