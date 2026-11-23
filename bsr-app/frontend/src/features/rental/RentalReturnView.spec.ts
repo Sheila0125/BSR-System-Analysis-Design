@@ -1,9 +1,34 @@
 import { sessionOptions } from '../../../tests/unit/sessionOptions'
 import { flushPromises, mount } from '@vue/test-utils'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import RentalReturnView from './RentalReturnView.vue'
-const api = vi.hoisted(() => ({ list: vi.fn(async () => []), returnLookup: vi.fn(), returns: vi.fn() }))
+import type { Contract } from './rentalApi'
+const api = vi.hoisted(() => ({ list: vi.fn<(storeId: string) => Promise<Contract[]>>(async () => []), returnLookup: vi.fn(), returns: vi.fn() }))
 vi.mock('./rentalApi', () => ({ rentalApi: api }))
+beforeEach(() => vi.resetAllMocks())
+it('selecting a listed contract loads its returnable items and supports selecting the batch explicitly', async () => {
+  api.list.mockResolvedValueOnce([{
+    contractId: '20', contractNumber: 'RC-20', customerId: '2', serviceStoreId: '4', sourceRequestId: '1',
+    rentalStartDate: '2026-11-23', rentalDays: 1, amountDue: '100.00', status: 'ACTIVE', charges: [],
+    items: [{ itemId: '21', equipmentId: '31', active: true, status: 'RENTED', dailyRateSnapshot: '100.00', checkedOutAt: '2026-11-23T08:00:00', returnedAt: null, returnStoreId: null }],
+  }])
+  api.returnLookup.mockResolvedValueOnce({ contractId: '20', status: 'ACTIVE', items: [
+    { itemId: '21', equipmentId: '31', status: 'RENTED', returnedAt: null },
+    { itemId: '22', equipmentId: '32', status: 'RETURNED', returnedAt: '2026-11-23T10:00:00' },
+  ] })
+  const wrapper = mount(RentalReturnView, sessionOptions(['4']))
+  await wrapper.get('[aria-label="接收门店编号"]').setValue('4')
+  await flushPromises()
+  await wrapper.get('[aria-label="待归还合同"]').setValue('20')
+  await flushPromises()
+  expect(api.returnLookup).toHaveBeenCalledWith('20', '4')
+  const checkbox = wrapper.get<HTMLInputElement>('input[type="checkbox"]')
+  expect(checkbox.element.checked).toBe(false)
+  await wrapper.findAll('button').find(button => button.text() === '选中全部可归还雪具')!.trigger('click')
+  expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(1)
+  expect(checkbox.element.checked).toBe(true)
+  expect(api.returns).not.toHaveBeenCalled()
+})
 it('AC-UC06 cross-store return failure retains selected item and fault description', async () => {
   api.returnLookup.mockResolvedValue({ contractId: '91', status: 'ACTIVE', items: [{ itemId: '92', equipmentId: '93', status: 'RENTED', returnedAt: null }] })
   api.returns.mockRejectedValue(new Error('offline'))

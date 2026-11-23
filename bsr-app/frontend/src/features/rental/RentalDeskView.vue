@@ -9,8 +9,9 @@ import EquipmentPicker from '../equipment/EquipmentPicker.vue'
 import { loadCatalog } from '../equipment/equipmentCatalogApi'
 import { conciseEquipmentName } from '../equipment/equipmentDisplay'
 import RentalInvoice from './RentalInvoice.vue'
+import ChargeTransactions from './ChargeTransactions.vue'
 import type { AvailableEquipment } from '../equipment/equipmentAvailabilityApi'
-import { rentalApi, type Contract, type ChangeRequest, type TransactionInput, type RecordedTransaction } from './rentalApi'
+import { rentalApi, type Contract, type ChangeRequest } from './rentalApi'
 
 const storeId = ref('')
 const sourceRequestId = ref('')
@@ -25,13 +26,11 @@ const contract = ref<Contract | null>(null)
 const pendingItems = ref<string[]>([])
 const busy = ref(false)
 const error = ref('')
-const result = ref<TransactionInput>({ type: 'PAYMENT', externalId: '', amount: '', status: 'PENDING_CONFIRMATION', processedAt: null })
-const chargeId = ref('')
-const history = ref<RecordedTransaction[]>([])
 const invoiceOpen = ref(false)
 const invoiceVersion = ref(0)
 const pickerGeneration = ref(0)
 const replacementGeneration = ref(0)
+const issuableIds = computed(() => contract.value?.items.filter(item => item.active && item.status === 'PENDING_ISSUE').map(item => item.itemId) ?? [])
 const contractStore = computed(() => contract.value ? storeId.value : '')
 const { options: catalog } = useStoreOptions(contractStore, id => loadCatalog(id, '', ''))
 const equipmentById = computed(() => new Map(catalog.value.map(item => [item.equipmentId, item])))
@@ -55,7 +54,7 @@ const selectionMatchesRequest = computed(() => {
     && selection.value.every(item => item.skillLevel === selectedRequest.value?.skillLevel)
     && requestRequirements.value.every(item => actual.get(item.equipmentCategory) === item.quantity)
 })
-watch(storeId, () => { sourceRequestId.value = ''; contracts.value = []; changes.value = []; contract.value = null; selection.value = []; replacementSelection.value = []; pendingItems.value = []; chargeId.value = ''; history.value = [] })
+watch(storeId, () => { sourceRequestId.value = ''; contracts.value = []; changes.value = []; contract.value = null; selection.value = []; replacementSelection.value = []; pendingItems.value = [] })
 async function run(operation: () => Promise<void>) {
   if (busy.value) return
   busy.value = true
@@ -69,7 +68,7 @@ function selectContract(value: Contract) {
     replacementGeneration.value++
     invoiceOpen.value = false
   }
-  contract.value = value; pendingItems.value = []; history.value = []; chargeId.value = ''
+  contract.value = value; pendingItems.value = []
   invoiceVersion.value++
 }
 function load() { return run(async () => {
@@ -113,13 +112,6 @@ function action(kind: 'submit' | 'cancel' | 'issue') { return run(async () => {
   if (!contract.value) return
   selectContract(kind === 'issue' ? await rentalApi.issue(contract.value.contractId, pendingItems.value) : await rentalApi[kind](contract.value.contractId))
 }) }
-function record() { return run(async () => {
-  await rentalApi.record(chargeId.value, { ...result.value, processedAt: result.value.processedAt || null })
-  history.value = await rentalApi.transactions(chargeId.value)
-  if (contract.value) contract.value = await rentalApi.read(contract.value.contractId)
-  invoiceVersion.value++
-}) }
-function showHistory() { return run(async () => { history.value = await rentalApi.transactions(chargeId.value) }) }
 </script>
 <template>
   <section>
@@ -330,53 +322,29 @@ function showHistory() { return run(async () => { history.value = await rentalAp
         替换所选草稿雪具并重新确认
       </button>
       <button
+        v-if="['PENDING_ISSUE','ACTIVE'].includes(contract.status) && issuableIds.length > 1"
+        type="button"
+        :disabled="busy"
+        @click="pendingItems = pendingItems.length === issuableIds.length ? [] : issuableIds.slice()"
+      >
+        {{ pendingItems.length === issuableIds.length ? '清除发放选择' : '选中全部待发放雪具' }}
+      </button>
+      <button
         v-if="['PENDING_ISSUE','ACTIVE'].includes(contract.status)"
         :disabled="busy || pendingItems.length === 0"
         @click="action('issue')"
       >
         登记所选雪具发放
       </button>
-      <h3>费用明细</h3>
-      <label>费用<select v-model="chargeId"><option value="">选择费用项</option><option
-        v-for="c in contract.charges"
-        :key="c.chargeId"
-        :value="c.chargeId"
-      >{{ uiText(c.type) }} · {{ c.amount }} · {{ uiText(c.status) }}</option></select></label>
-      <button
-        :disabled="busy || !chargeId"
-        @click="showHistory"
-      >
-        查看历史交易记录
-      </button>
-      <form @submit.prevent="record">
-        <label>类型<select v-model="result.type"><option value="PAYMENT">付款</option><option value="SUPPLEMENT">补缴</option><option value="REFUND">退款</option></select></label>
-        <label>外部交易编号<input
-          v-model="result.externalId"
-          maxlength="100"
-          required
-        ></label>
-        <label>金额<input
-          v-model="result.amount"
-          placeholder="418.50"
-          required
-        ></label>
-        <label>结果<select v-model="result.status"><option value="PENDING_CONFIRMATION">待确认</option><option value="SUCCEEDED">成功</option><option value="FAILED">失败</option></select></label>
-        <label>第三方处理时间（UTC ISO）<input
-          v-model="result.processedAt"
-          placeholder="2026-10-10T09:00:00Z"
-        ></label>
-        <button :disabled="busy || !chargeId">
-          登记外部交易结果
-        </button>
-      </form>
-      <ul>
-        <li
-          v-for="t in history"
-          :key="t.transactionId"
-        >
-          {{ t.source === 'SIMULATED' ? '顾客模拟付款（不扣款）' : '外部交易（员工登记）' }} · {{ t.externalId }} · {{ uiText(t.type) }} · {{ t.amount }} · {{ uiText(t.status) }} · {{ t.processedAt }}
-        </li>
-      </ul>
+      <ChargeTransactions
+        :key="contract.contractId"
+        :charges="contract.charges"
+        :disabled="busy"
+        :can-record="!['DRAFT','PENDING_CONFIRMATION','CANCELLED'].includes(contract.status)"
+        :version="invoiceVersion"
+        @saving="busy = $event"
+        @recorded="refresh"
+      />
     </article>
     <h2>顾客提交的变更意向</h2>
     <ul>

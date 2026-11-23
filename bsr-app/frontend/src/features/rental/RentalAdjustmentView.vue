@@ -5,8 +5,9 @@ import { uiText } from '../../shared/presentation/zh'
 import { ref, watch } from 'vue'
 import { useStoreOptions } from '../../shared/components/useStoreOptions'
 import EquipmentPicker from '../equipment/EquipmentPicker.vue'
+import ChargeTransactions from './ChargeTransactions.vue'
 import type { AvailableEquipment } from '../equipment/equipmentAvailabilityApi'
-import { rentalApi, type Adjustment, type ChangeRequest, type TransactionInput, type RecordedTransaction } from './rentalApi'
+import { rentalApi, type Adjustment, type ChangeRequest } from './rentalApi'
 
 const storeId = ref(''), contractId = ref(''), changeId = ref(''), type = ref('REPLACE')
 const { options: contracts, loading: contractsLoading, error: contractsError } = useStoreOptions(storeId, rentalApi.list)
@@ -14,10 +15,8 @@ const manualContract = ref(false), manualChange = ref(false)
 const detail = ref<Adjustment | null>(null), queue = ref<ChangeRequest[]>([])
 const selection = ref<AvailableEquipment[]>([]), returned = ref<string[]>([]), issued = ref<string[]>([])
 const outcomes = ref<Record<string, string>>({}), notes = ref<Record<string, string>>({})
-const busy = ref(false), error = ref(''), pickerGeneration = ref(0), chargeId = ref('')
-const history = ref<RecordedTransaction[]>([])
-const result = ref<TransactionInput>({ type: 'SUPPLEMENT', externalId: '', amount: '', status: 'PENDING_CONFIRMATION', processedAt: null })
-watch(storeId, () => { contractId.value = ''; changeId.value = ''; detail.value = null; queue.value = []; selection.value = []; returned.value = []; issued.value = []; outcomes.value = {}; notes.value = {}; history.value = []; chargeId.value = '' })
+const busy = ref(false), error = ref(''), pickerGeneration = ref(0), feeVersion = ref(0)
+watch(storeId, () => { contractId.value = ''; changeId.value = ''; detail.value = null; queue.value = []; selection.value = []; returned.value = []; issued.value = []; outcomes.value = {}; notes.value = {} })
 async function run(operation: () => Promise<void>) {
   if (busy.value) return
   busy.value = true; error.value = ''
@@ -28,11 +27,12 @@ function apply(value: Adjustment) {
   if (value.change.requestedStoreId !== storeId.value) throw new Error('请先选择实际办理门店。')
   if (detail.value?.change.changeId !== value.change.changeId) {
     selection.value = []; returned.value = []; issued.value = []; outcomes.value = {}; notes.value = {}
-    chargeId.value = ''; history.value = []; pickerGeneration.value++
+    pickerGeneration.value++
   }
   detail.value = value; changeId.value = value.change.changeId; contractId.value = value.change.contractId
+  feeVersion.value++
 }
-function load() { return run(async () => { apply(await rentalApi.adjustment(changeId.value)) }) }
+function load(id = changeId.value) { return run(async () => { apply(await rentalApi.adjustment(id)) }) }
 function loadQueue() { return run(async () => { queue.value = await rentalApi.changes(storeId.value) }) }
 function start() { return run(async () => { apply(await rentalApi.startAdjustment(contractId.value, storeId.value, type.value)) }) }
 function receive() { return run(async () => {
@@ -44,12 +44,6 @@ function quote() { return run(async () => {
   selection.value = []; pickerGeneration.value++
 }) }
 function stop() { return run(async () => { apply(await rentalApi.stopAdjustment(detail.value!.change.changeId)); selection.value = []; pickerGeneration.value++ }) }
-function record() { return run(async () => {
-  await rentalApi.record(chargeId.value, { ...result.value, processedAt: result.value.processedAt || null })
-  history.value = await rentalApi.transactions(chargeId.value)
-  apply(await rentalApi.adjustment(detail.value!.change.changeId))
-}) }
-function showHistory() { return run(async () => { history.value = await rentalApi.transactions(chargeId.value) }) }
 function issue() { return run(async () => {
   await rentalApi.issueAtStore(detail.value!.change.contractId, storeId.value, issued.value)
   apply(await rentalApi.adjustment(detail.value!.change.changeId)); issued.value = []
@@ -77,6 +71,13 @@ function issue() { return run(async () => {
         :key="c.changeId"
       >
         {{ c.changeNumber }} · {{ uiText(c.type) }} · {{ uiText(c.status) }} · {{ c.note }}
+        <button
+          type="button"
+          :disabled="busy"
+          @click="load(c.changeId)"
+        >
+          打开 {{ c.changeNumber }}
+        </button>
         <p
           v-if="c.requestedReturnItemIds?.length"
           :data-test="`return-intent-${c.changeId}`"
@@ -164,7 +165,7 @@ function issue() { return run(async () => {
     <button
       data-test="load-adjustment"
       :disabled="busy || !storeId || !changeId"
-      @click="load"
+      @click="load()"
     >
       查询或刷新调整
     </button>
@@ -254,40 +255,15 @@ function issue() { return run(async () => {
       <p v-if="detail.change.status === 'PROCESSING' && detail.change.amountDelta !== null">
         等待顾客确认调整内容与金额，暂不能发放新增雪具。
       </p>
-      <label>调整费用<select v-model="chargeId"><option value="">选择费用项</option><option
-        v-for="c in detail.charges"
-        :key="c.chargeId"
-        :value="c.chargeId"
-      >{{ uiText(c.type) }} · {{ c.amount }} · {{ uiText(c.status) }}</option></select></label>
-      <button
-        :disabled="busy || !chargeId"
-        @click="showHistory"
-      >
-        查看历史外部交易
-      </button>
-      <form @submit.prevent="record">
-        <label>类型<select v-model="result.type"><option value="SUPPLEMENT">补缴</option><option value="REFUND">退款</option></select></label><label>外部交易编号<input
-          v-model="result.externalId"
-          maxlength="100"
-          required
-        ></label><label>金额<input
-          v-model="result.amount"
-          required
-        ></label><label>结果<select v-model="result.status"><option value="PENDING_CONFIRMATION">待确认</option><option value="SUCCEEDED">成功</option><option value="FAILED">失败</option></select></label><label>第三方处理时间（UTC）<input
-          v-model="result.processedAt"
-          placeholder="2026-10-10T09:00:00Z"
-        ></label><button :disabled="busy || !chargeId">
-          登记已核实的外部交易结果
-        </button>
-      </form>
-      <ul>
-        <li
-          v-for="t in history"
-          :key="t.transactionId"
-        >
-          {{ t.externalId }} · {{ t.amount }} · {{ uiText(t.status) }} · {{ t.processedAt }}
-        </li>
-      </ul>
+      <ChargeTransactions
+        :key="detail.change.changeId"
+        :charges="detail.charges"
+        :disabled="busy"
+        :can-record="detail.change.status === 'COMPLETED'"
+        :version="feeVersion"
+        @saving="busy = $event"
+        @recorded="load(detail.change.changeId)"
+      />
       <button
         :disabled="busy || !issued.length || detail.charges.some(c => c.type !== 'REFUND' && c.status !== 'SETTLED')"
         @click="issue"

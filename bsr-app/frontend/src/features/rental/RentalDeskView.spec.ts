@@ -153,3 +153,23 @@ it('AC-UC04 switching contracts clears an observed replacement from the previous
   await wrapper.get('input[type="checkbox"]').setValue(true)
   expect(wrapper.findAll('button').find(b => b.text().startsWith('替换所选草稿雪具'))?.attributes('disabled')).toBeDefined()
 })
+it('loads the only unsettled fee and automatically shows its existing simulated receipt and remaining balance', async () => {
+  api.list.mockResolvedValue([{ contractId: '7', contractNumber: 'RC-7', status: 'PENDING_PAYMENT', customerId: '2', rentalDays: 1, amountDue: '100.00', items: [],
+    charges: [{ chargeId: '11', type: 'INITIAL', amount: '100.00', status: 'PENDING' }] }])
+  api.changes.mockResolvedValue([])
+  api.transactions.mockResolvedValue([
+    { transactionId: '1', type: 'PAYMENT', externalId: 'SIM-TEST-1', status: 'SUCCEEDED', amount: '30.01', source: 'SIMULATED' },
+    { transactionId: '2', type: 'PAYMENT', externalId: 'EXT-FAILED', status: 'FAILED', amount: '20.00', source: 'EXTERNAL' },
+  ])
+  const wrapper = mount(RentalDeskView, sessionOptions(['3']))
+  await wrapper.get('[aria-label="门店编号"]').setValue('3')
+  await wrapper.findAll('button').find(button => button.text() === '查询合同与变更需求')!.trigger('click')
+  await flushPromises()
+  await wrapper.get('[aria-label="门店合同"]').setValue('7')
+  await flushPromises()
+
+  expect(api.transactions).toHaveBeenCalledWith('11')
+  expect(wrapper.text()).toContain('SIM-TEST-1')
+  expect(wrapper.get<HTMLInputElement>('[aria-label="金额"]').element.value).toBe('69.99')
+  expect(wrapper.get<HTMLInputElement>('[aria-label="外部交易编号"]').element.value).toBe('')
+})

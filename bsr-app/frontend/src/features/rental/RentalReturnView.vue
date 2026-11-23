@@ -13,11 +13,21 @@ const returnable = computed(() => contracts.value.filter(row => row.items.some(i
 watch([storeId, manualContract], () => { contractId.value = '' })
 const receipt = ref<ReturnReceipt | null>(null)
 const selected = ref<string[]>([])
+const returnableItems = computed(() => receipt.value?.items.filter(item => item.status === 'RENTED') ?? [])
 const outcome = ref('NORMAL')
 const note = ref('')
 const busy = ref(false)
 const error = ref('')
-watch([storeId, contractId], () => { receipt.value = null; selected.value = [] })
+watch([storeId, contractId], () => {
+  receipt.value = null
+  selected.value = []
+  outcome.value = 'NORMAL'
+  note.value = ''
+  error.value = ''
+})
+watch(contractId, id => {
+  if (id && storeId.value && !manualContract.value) void lookup()
+}, { flush: 'post' })
 async function run(operation: () => Promise<ReturnReceipt>) {
   if (busy.value) return
   busy.value = true
@@ -27,7 +37,14 @@ async function run(operation: () => Promise<ReturnReceipt>) {
   finally { busy.value = false }
 }
 function lookup() { return run(() => rentalApi.returnLookup(contractId.value, storeId.value)) }
-function receive() { return run(() => rentalApi.returns(contractId.value, storeId.value, selected.value.map(itemId => ({ itemId, outcome: outcome.value, faultDescription: note.value || null })))) }
+function receive() { return run(async () => {
+  const result = await rentalApi.returns(contractId.value, storeId.value, selected.value.map(itemId => ({
+    itemId, outcome: outcome.value, faultDescription: note.value || null,
+  })))
+  outcome.value = 'NORMAL'
+  note.value = ''
+  return result
+}) }
 </script>
 <template>
   <section>
@@ -78,7 +95,7 @@ function receive() { return run(() => rentalApi.returns(contractId.value, storeI
       :disabled="busy || !storeId || !contractId"
       @click="lookup"
     >
-      查询归还所需信息
+      {{ busy ? '正在处理…' : manualContract ? '查询归还所需信息' : '刷新归还所需信息' }}
     </button>
     <p
       v-if="error"
@@ -101,6 +118,14 @@ function receive() { return run(() => rentalApi.returns(contractId.value, storeI
           >雪具 {{ i.equipmentId }} · {{ uiText(i.status) }} · {{ i.returnedAt }}</label>
         </li>
       </ul>
+      <button
+        v-if="returnableItems.length"
+        type="button"
+        :disabled="busy"
+        @click="selected = selected.length === returnableItems.length ? [] : returnableItems.map(item => item.itemId)"
+      >
+        {{ selected.length === returnableItems.length ? '清除归还选择' : '选中全部可归还雪具' }}
+      </button>
       <label>检查结果<select v-model="outcome"><option value="NORMAL">正常</option><option value="FAULT">故障</option><option value="PENDING_REVIEW">待复核</option></select></label>
       <label>故障或差异说明<textarea
         v-model="note"
