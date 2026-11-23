@@ -2,10 +2,12 @@
 import StoreSelect from '../identity/StoreSelect.vue'
 import { errorText } from '../../shared/presentation/zh'
 import { uiText } from '../../shared/presentation/zh'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useStoreOptions } from '../../shared/components/useStoreOptions'
 import { loadEmployeeRentalRequests } from '../customerrequest/employeeRequestApi'
 import EquipmentPicker from '../equipment/EquipmentPicker.vue'
+import { loadCatalog } from '../equipment/equipmentCatalogApi'
+import { conciseEquipmentName } from '../equipment/equipmentDisplay'
 import RentalInvoice from './RentalInvoice.vue'
 import type { AvailableEquipment } from '../equipment/equipmentAvailabilityApi'
 import { rentalApi, type Contract, type ChangeRequest, type TransactionInput, type RecordedTransaction } from './rentalApi'
@@ -16,6 +18,7 @@ const {
   options: requests, loading: requestsLoading, error: requestsError, refresh: refreshRequests,
 } = useStoreOptions(storeId, async id => (await loadEmployeeRentalRequests(id)).filter(row => row.status === 'ACCEPTED'))
 const selection = ref<AvailableEquipment[]>([])
+const replacementSelection = ref<AvailableEquipment[]>([])
 const contracts = ref<Contract[]>([])
 const changes = ref<ChangeRequest[]>([])
 const contract = ref<Contract | null>(null)
@@ -28,7 +31,31 @@ const history = ref<RecordedTransaction[]>([])
 const invoiceOpen = ref(false)
 const invoiceVersion = ref(0)
 const pickerGeneration = ref(0)
-watch(storeId, () => { sourceRequestId.value = ''; contracts.value = []; changes.value = []; contract.value = null; selection.value = []; pendingItems.value = []; chargeId.value = ''; history.value = [] })
+const replacementGeneration = ref(0)
+const contractStore = computed(() => contract.value ? storeId.value : '')
+const { options: catalog } = useStoreOptions(contractStore, id => loadCatalog(id, '', ''))
+const equipmentById = computed(() => new Map(catalog.value.map(item => [item.equipmentId, item])))
+const selectedRequest = computed(() => requests.value.find(row => row.requestId === sourceRequestId.value) ?? null)
+const requestRequirements = computed(() => {
+  const counts = new Map<string, number>()
+  selectedRequest.value?.items.forEach(item => counts.set(
+    item.equipmentCategory,
+    (counts.get(item.equipmentCategory) ?? 0) + item.quantity,
+  ))
+  return [...counts].map(([equipmentCategory, quantity]) => ({ equipmentCategory, quantity }))
+})
+const selectionMatchesRequest = computed(() => {
+  if (!selectedRequest.value) return false
+  const actual = new Map<string, number>()
+  selection.value.forEach(item => actual.set(
+    item.equipmentCategory,
+    (actual.get(item.equipmentCategory) ?? 0) + 1,
+  ))
+  return selection.value.length === requestRequirements.value.reduce((sum, item) => sum + item.quantity, 0)
+    && selection.value.every(item => item.skillLevel === selectedRequest.value?.skillLevel)
+    && requestRequirements.value.every(item => actual.get(item.equipmentCategory) === item.quantity)
+})
+watch(storeId, () => { sourceRequestId.value = ''; contracts.value = []; changes.value = []; contract.value = null; selection.value = []; replacementSelection.value = []; pendingItems.value = []; chargeId.value = ''; history.value = [] })
 async function run(operation: () => Promise<void>) {
   if (busy.value) return
   busy.value = true
@@ -37,7 +64,11 @@ async function run(operation: () => Promise<void>) {
   finally { busy.value = false }
 }
 function selectContract(value: Contract) {
-  if (contract.value?.contractId !== value.contractId) { selection.value = []; pickerGeneration.value++; invoiceOpen.value = false }
+  if (contract.value?.contractId !== value.contractId) {
+    replacementSelection.value = []
+    replacementGeneration.value++
+    invoiceOpen.value = false
+  }
   contract.value = value; pendingItems.value = []; history.value = []; chargeId.value = ''
   invoiceVersion.value++
 }
@@ -52,8 +83,14 @@ function pickContract(event: Event) {
   const chosen = contracts.value.find(row => row.contractId === id)
   if (chosen) selectContract(chosen)
 }
+function selectRequest(requestId: string) {
+  if (sourceRequestId.value === requestId) return
+  sourceRequestId.value = requestId
+  selection.value = []
+  pickerGeneration.value++
+}
 function create() { return run(async () => {
-  if (!requests.value.some(row => row.requestId === sourceRequestId.value)) return
+  if (requestsLoading.value || !selectionMatchesRequest.value) return
   selectContract(await rentalApi.create(storeId.value, sourceRequestId.value, selection.value.map(i => ({ equipmentId: i.equipmentId, expectedDailyRate: i.currentDailyRate }))))
   sourceRequestId.value = ''
   selection.value = []
@@ -64,9 +101,14 @@ function create() { return run(async () => {
 function refresh() { return run(async () => { if (contract.value) selectContract(await rentalApi.read(contract.value.contractId)) }) }
 function revise() { return run(async () => {
   if (!contract.value) return
-  selectContract(await rentalApi.revise(contract.value.contractId, pendingItems.value, selection.value.map(i => ({ equipmentId: i.equipmentId, expectedDailyRate: i.currentDailyRate }))))
-  selection.value = []; pickerGeneration.value++
+  selectContract(await rentalApi.revise(contract.value.contractId, pendingItems.value, replacementSelection.value.map(i => ({ equipmentId: i.equipmentId, expectedDailyRate: i.currentDailyRate }))))
+  replacementSelection.value = []
+  replacementGeneration.value++
 }) }
+function equipmentLabel(equipmentId: string): string {
+  const item = equipmentById.value.get(equipmentId)
+  return item ? `${conciseEquipmentName(item.equipmentName)} · ${uiText(item.equipmentCategory)} · ${item.inventoryNumber}` : `雪具 ${equipmentId}`
+}
 function action(kind: 'submit' | 'cancel' | 'issue') { return run(async () => {
   if (!contract.value) return
   selectContract(kind === 'issue' ? await rentalApi.issue(contract.value.contractId, pendingItems.value) : await rentalApi[kind](contract.value.contractId))
@@ -102,37 +144,102 @@ function showHistory() { return run(async () => { history.value = await rentalAp
       {{ error }}
     </p>
     <h2>根据已受理需求创建合同</h2>
-    <label>已受理需求<select
-      v-model="sourceRequestId"
-      aria-label="已受理需求"
-      :disabled="busy || requestsLoading || !requests.length"
+    <p v-if="requestsLoading">
+      正在加载需求…
+    </p>
+    <p
+      v-else-if="!requests.length"
+      class="empty-state"
     >
-      <option
-        value=""
-        disabled
-      >{{ requestsLoading ? '正在加载需求…' : requests.length ? '选择需求单' : '暂无已受理需求' }}</option>
-      <option
+      暂无已受理需求
+    </p>
+    <div
+      v-else
+      class="request-grid"
+      aria-label="已受理需求"
+    >
+      <button
         v-for="row in requests"
         :key="row.requestId"
-        :value="row.requestId"
+        type="button"
+        class="request-choice"
+        :class="{ selected: row.requestId === sourceRequestId }"
+        :aria-label="`选择需求 ${row.requestNumber}`"
+        :aria-pressed="row.requestId === sourceRequestId"
+        :disabled="busy"
+        @click="selectRequest(row.requestId)"
       >
-        {{ row.requestNumber }} · {{ row.rentalStartDate }} · {{ row.rentalDays }} 天
-      </option>
-    </select></label>
+        <span class="request-number">{{ row.requestNumber }}</span>
+        <span class="request-meta">{{ row.rentalStartDate }} · {{ row.rentalDays }} 天 · {{ uiText(row.skillLevel) }}</span>
+        <span class="request-thumbnails">
+          <span
+            v-for="(item, index) in row.items"
+            :key="index"
+            class="demand-thumbnail"
+          >
+            <span aria-hidden="true">{{ uiText(item.equipmentCategory).slice(0, 2) }}</span>
+            {{ uiText(item.equipmentCategory) }} × {{ item.quantity }}
+          </span>
+        </span>
+      </button>
+    </div>
     <p
       v-if="requestsError"
       role="alert"
     >
       {{ requestsError }}
     </p>
+    <article
+      v-if="selectedRequest"
+      class="request-detail"
+      aria-label="已选需求详情"
+    >
+      <header>
+        <div>
+          <p class="eyebrow">
+            已选需求
+          </p>
+          <h3>{{ selectedRequest.requestNumber }}</h3>
+        </div>
+        <p>顾客 {{ selectedRequest.customerId }}</p>
+      </header>
+      <dl>
+        <dt>起租安排</dt><dd>{{ selectedRequest.rentalStartDate }} 起 · {{ selectedRequest.rentalDays }} 个整日</dd>
+        <dt>技术等级</dt><dd>{{ uiText(selectedRequest.skillLevel) }}</dd>
+        <template
+          v-for="(item, index) in selectedRequest.items"
+          :key="index"
+        >
+          <dt>{{ uiText(item.equipmentCategory) }}</dt>
+          <dd>数量 {{ item.quantity }}<span v-if="item.fittingNote"> · {{ item.fittingNote }}</span></dd>
+        </template>
+      </dl>
+      <details v-if="selectedRequest.supplements.length">
+        <summary>顾客补充资料</summary>
+        <ul>
+          <li
+            v-for="cycle in selectedRequest.supplements"
+            :key="cycle.cycleNumber"
+          >
+            {{ cycle.reason }} · {{ cycle.customerResponse || '尚未回复' }}
+          </li>
+        </ul>
+      </details>
+      <p class="workflow-note">
+        请按以上需求配齐雪具；合同经顾客确认并完成费用处理后，再办理实物发放。
+      </p>
+    </article>
     <EquipmentPicker
+      v-if="selectedRequest"
       :key="pickerGeneration"
       :store-id="storeId"
       :disabled="busy"
+      :requirements="requestRequirements"
+      :preferred-skill-level="selectedRequest?.skillLevel"
       @selection="selection = $event"
     />
     <button
-      :disabled="busy || requestsLoading || !requests.some(row => row.requestId === sourceRequestId) || selection.length === 0"
+      :disabled="busy || requestsLoading || !selectionMatchesRequest"
       @click="create"
     >
       创建合同草稿
@@ -204,12 +311,20 @@ function showHistory() { return run(async () => { history.value = await rentalAp
             v-model="pendingItems"
             type="checkbox"
             :value="i.itemId"
-          >雪具 {{ i.equipmentId }} · 日租金快照 {{ i.dailyRateSnapshot }} / 天 · {{ uiText(i.status) }} {{ i.active ? '' : '（已失效历史项）' }} · 已发放 {{ i.checkedOutAt || '未发放' }} · 已归还 {{ i.returnedAt || '未归还' }}</label>
+          >{{ equipmentLabel(i.equipmentId) }} · 日租金快照 {{ i.dailyRateSnapshot }} / 天 · {{ uiText(i.status) }} {{ i.active ? '' : '（已失效历史项）' }} · 已发放 {{ i.checkedOutAt || '未发放' }} · 已归还 {{ i.returnedAt || '未归还' }}</label>
         </li>
       </ul>
+      <EquipmentPicker
+        v-if="contract.status === 'DRAFT'"
+        v-show="pendingItems.length"
+        :key="replacementGeneration"
+        :store-id="storeId"
+        :disabled="busy"
+        @selection="replacementSelection = $event"
+      />
       <button
         v-if="contract.status === 'DRAFT'"
-        :disabled="busy || !pendingItems.length || !selection.length"
+        :disabled="busy || !pendingItems.length || !replacementSelection.length"
         @click="revise"
       >
         替换所选草稿雪具并重新确认
@@ -278,5 +393,23 @@ function showHistory() { return run(async () => { history.value = await rentalAp
 label { display: block; margin-block: .7rem; }
 input, select, button { padding: .6rem; margin: .3rem; }
 article { border: 1px solid #ccd4df; padding: 1rem; margin-block: 1rem; }
+.request-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: .75rem; margin-block: .75rem; }
+.request-choice { display: grid; gap: .55rem; width: 100%; margin: 0; border: 1px solid #cbd8e3; border-radius: .8rem; background: #fff; color: #183b4b; text-align: left; overflow-wrap: anywhere; }
+.request-choice:hover { border-color: #4d8098; background: #f5fafc; }
+.request-choice.selected { border-color: #176f8c; box-shadow: 0 0 0 2px #cdebf5; background: #f2fbfe; }
+.request-number { font-size: 1.05rem; font-weight: 750; }
+.request-meta { color: #506675; font-size: .92rem; }
+.request-thumbnails { display: flex; flex-wrap: wrap; gap: .4rem; }
+.demand-thumbnail { display: inline-flex; align-items: center; gap: .35rem; font-size: .88rem; }
+.demand-thumbnail > span { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: .45rem; background: #dff1f7; color: #145873; font-size: .72rem; font-weight: 700; }
+.request-detail { border-color: #a9c9d7; border-radius: .8rem; background: linear-gradient(135deg, #f8fcfe, #eef7fa); }
+.request-detail header { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+.request-detail h3, .request-detail p { margin-block: 0 .45rem; }
+.request-detail dl { display: grid; grid-template-columns: minmax(6rem, auto) 1fr; gap: .4rem 1rem; }
+.request-detail dt { font-weight: 700; }
+.request-detail dd { margin: 0; }
+.eyebrow { color: #176f8c; font-size: .78rem; font-weight: 700; letter-spacing: .08em; }
+.workflow-note { margin-top: .8rem !important; color: #4b6170; }
+.empty-state { color: #596c78; }
 [role="alert"] { color: #9b1c1c; }
 </style>

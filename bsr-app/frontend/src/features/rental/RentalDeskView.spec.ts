@@ -8,24 +8,76 @@ vi.mock('./rentalApi', () => ({ rentalApi: api }))
 const requestApi = vi.hoisted(() => ({ loadEmployeeRentalRequests: vi.fn() }))
 vi.mock('../customerrequest/employeeRequestApi', () => requestApi)
 vi.mock('../equipment/equipmentAvailabilityApi', () => ({ loadAvailableEquipment: vi.fn(async () => []) }))
+vi.mock('../equipment/equipmentCatalogApi', () => ({ loadCatalog: vi.fn(async () => [
+  { equipmentId: '4', inventoryNumber: 'INV-SKI-04', equipmentName: 'Atomic Redster 2026-10-25', equipmentCategory: 'SKI' },
+]) }))
 beforeEach(() => {
   vi.clearAllMocks()
   requestApi.loadEmployeeRentalRequests.mockResolvedValue([
-    { requestId: '9007199254740993', requestNumber: 'RQ-99', rentalStartDate: '2026-12-20', rentalDays: 2, status: 'ACCEPTED' },
+    {
+      requestId: '9007199254740993', requestNumber: 'RQ-99', customerId: '51', serviceStoreId: '3',
+      rentalStartDate: '2026-12-20', rentalDays: 2, skillLevel: 'INTERMEDIATE', submittedAt: '2026-11-23T10:00:00',
+      status: 'ACCEPTED', acceptedByEmployeeId: '9', supplements: [],
+      items: [
+        { equipmentCategory: 'SKI', quantity: 1, fittingNote: '板长 160 cm' },
+        { equipmentCategory: 'SKI_BOOTS', quantity: 1, fittingNote: '鞋码 42' },
+      ],
+    },
     { requestId: '100', requestNumber: 'RQ-100', status: 'PENDING' },
   ])
+})
+it('shows accepted requests as scannable demand cards and passes the selected demand to equipment picking', async () => {
+  const wrapper = mount(RentalDeskView, sessionOptions(['1', '3']))
+  await wrapper.get('[aria-label="门店编号"]').setValue('3')
+  await flushPromises()
+
+  const card = wrapper.get('[aria-label="选择需求 RQ-99"]')
+  expect(card.text()).toContain('2026-12-20 · 2 天')
+  expect(card.text()).toContain('双板 × 1')
+  expect(card.text()).toContain('双板雪鞋 × 1')
+  await card.trigger('click')
+
+  const detail = wrapper.get('[aria-label="已选需求详情"]')
+  expect(detail.text()).toContain('顾客 51')
+  expect(detail.text()).toContain('中级')
+  expect(detail.text()).toContain('板长 160 cm')
+  expect(detail.text()).toContain('鞋码 42')
+  expect(wrapper.getComponent(EquipmentPicker).props('requirements')).toEqual([
+    { equipmentCategory: 'SKI', quantity: 1 },
+    { equipmentCategory: 'SKI_BOOTS', quantity: 1 },
+  ])
+  expect(wrapper.getComponent(EquipmentPicker).props('preferredSkillLevel')).toBe('INTERMEDIATE')
+})
+it('only enables contract creation after every requested category and quantity is matched', async () => {
+  const wrapper = mount(RentalDeskView, sessionOptions(['1', '3']))
+  await wrapper.get('[aria-label="门店编号"]').setValue('3')
+  await flushPromises()
+  await wrapper.get('[aria-label="选择需求 RQ-99"]').trigger('click')
+
+  const create = () => wrapper.findAll('button').find(button => button.text() === '创建合同草稿')!
+  wrapper.getComponent(EquipmentPicker).vm.$emit('selection', [
+    { equipmentId: '1', equipmentCategory: 'SKI', skillLevel: 'INTERMEDIATE', currentDailyRate: '350.00' },
+  ])
+  await wrapper.vm.$nextTick()
+  expect(create().attributes('disabled')).toBeDefined()
+
+  wrapper.getComponent(EquipmentPicker).vm.$emit('selection', [
+    { equipmentId: '1', equipmentCategory: 'SKI', skillLevel: 'INTERMEDIATE', currentDailyRate: '350.00' },
+    { equipmentId: '2', equipmentCategory: 'SKI_BOOTS', skillLevel: 'INTERMEDIATE', currentDailyRate: '150.00' },
+  ])
+  await wrapper.vm.$nextTick()
+  expect(create().attributes('disabled')).toBeUndefined()
 })
 it('only offers accepted requests and prevents creation with an unselected request', async () => {
   const wrapper = mount(RentalDeskView, sessionOptions(['1', '3']))
   await wrapper.get('[aria-label="门店编号"]').setValue('1')
   await flushPromises()
-  wrapper.getComponent(EquipmentPicker).vm.$emit('selection', [{ equipmentId: '1', currentDailyRate: '350.00' }])
-  await wrapper.vm.$nextTick()
+  expect(wrapper.findComponent(EquipmentPicker).exists()).toBe(false)
   await wrapper.findAll('button').find(b => b.text() === '创建合同草稿')?.trigger('click')
   await flushPromises()
   expect(api.create).not.toHaveBeenCalled()
-  expect(wrapper.get('option[value="9007199254740993"]').text()).toContain('RQ-99')
-  expect(wrapper.find('option[value="100"]').exists()).toBe(false)
+  expect(wrapper.get('[aria-label="选择需求 RQ-99"]').text()).toContain('RQ-99')
+  expect(wrapper.find('[aria-label="选择需求 RQ-100"]').exists()).toBe(false)
 })
 it('AC-UC04 shows the pricing basis and exact server amounts without repricing historical items', async () => {
   api.list.mockResolvedValue([{ contractId: '7', contractNumber: 'RC-7', status: 'ACTIVE', customerId: '2', rentalStartDate: '2026-12-20', rentalDays: 3, amountDue: '418.50', items: [{ itemId: '8', equipmentId: '9007199254740993', dailyRateSnapshot: '99.50', status: 'RETURNED', active: false, checkedOutAt: '2026-12-20', returnedAt: '2026-12-20' }], charges: [] }])
@@ -49,14 +101,20 @@ it('AC-UC04 create failure retains request and observed selection for explicit r
   const wrapper = mount(RentalDeskView, sessionOptions(['1', '3']))
   await wrapper.get('[aria-label="门店编号"]').setValue('3')
   await flushPromises()
-  await wrapper.get('select:has(option[value="9007199254740993"])').setValue('9007199254740993')
-  wrapper.getComponent(EquipmentPicker).vm.$emit('selection', [{ equipmentId: '9', currentDailyRate: '99.50' }])
+  await wrapper.get('[aria-label="选择需求 RQ-99"]').trigger('click')
+  wrapper.getComponent(EquipmentPicker).vm.$emit('selection', [
+    { equipmentId: '9', equipmentCategory: 'SKI', skillLevel: 'INTERMEDIATE', currentDailyRate: '99.50' },
+    { equipmentId: '10', equipmentCategory: 'SKI_BOOTS', skillLevel: 'INTERMEDIATE', currentDailyRate: '59.50' },
+  ])
   await wrapper.vm.$nextTick()
   await wrapper.findAll('button').find(b => b.text() === '创建合同草稿')?.trigger('click')
   await flushPromises()
-  expect(api.create).toHaveBeenCalledWith('3', '9007199254740993', [{ equipmentId: '9', expectedDailyRate: '99.50' }])
+  expect(api.create).toHaveBeenCalledWith('3', '9007199254740993', [
+    { equipmentId: '9', expectedDailyRate: '99.50' },
+    { equipmentId: '10', expectedDailyRate: '59.50' },
+  ])
   expect(wrapper.get('[role="alert"]').text()).toContain('reconfirm')
-  expect((wrapper.get('select:has(option[value="9007199254740993"])').element as HTMLSelectElement).value).toBe('9007199254740993')
+  expect(wrapper.get('[aria-label="选择需求 RQ-99"]').attributes('aria-pressed')).toBe('true')
   expect(wrapper.findAll('button').find(b => b.text() === '创建合同草稿')?.attributes('disabled')).toBeUndefined()
 })
 
@@ -69,6 +127,8 @@ it('AC-UC04 failed draft revision retains old item and replacement selection', a
   await wrapper.findAll('button').find(b => b.text() === '查询合同与变更需求')?.trigger('click')
   await flushPromises()
   await wrapper.get('select:has(option[value="7"])').setValue('7')
+  await flushPromises()
+  expect(wrapper.get('article ul').text()).toContain('Atomic Redster · 双板 · INV-SKI-04')
   await wrapper.get('input[type="checkbox"]').setValue(true)
   wrapper.getComponent(EquipmentPicker).vm.$emit('selection', [{ equipmentId: '9', currentDailyRate: '120.00' }])
   await wrapper.vm.$nextTick()

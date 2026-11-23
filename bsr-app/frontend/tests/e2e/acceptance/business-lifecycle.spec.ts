@@ -67,7 +67,7 @@ if (process.env.E2E_PERSISTENCE_ONLY === '1') {
       // Customer uses the same real HTTP contract as the native mini-program.
       // Native wx.request/device compatibility is separately pending EV-WX02.
       await post(customer.request, '/api/auth/login', { loginName: `a10-customer-${base}`, password })
-      const requested = await post<{ requestId: string }>(customer.request, '/api/customer/requests', {
+      const requested = await post<{ requestId: string; requestNumber: string }>(customer.request, '/api/customer/requests', {
         serviceStoreId: store, rentalStartDate: date, rentalDays: 3, skillLevel: 'INTERMEDIATE',
         items: [{ equipmentCategory: 'SKI', quantity: 1, fittingNote: null }], confirmDuplicate: false,
       })
@@ -82,7 +82,8 @@ if (process.env.E2E_PERSISTENCE_ONLY === '1') {
 
       await page.goto('/rental/desk')
       await page.getByLabel('门店编号', { exact: true }).selectOption(store)
-      await page.getByLabel('已受理需求').selectOption(requested.requestId)
+      await page.getByRole('button', { name: `选择需求 ${requested.requestNumber}`, exact: true }).click()
+      await expect(page.getByLabel('已选需求详情')).toContainText('双板')
       await page.getByLabel('可租雪具', { exact: true }).selectOption(String(base + 6))
       await page.getByRole('button', { name: '添加雪具', exact: true }).click()
       const createdResponse = page.waitForResponse(r => r.url().endsWith('/api/contracts') && r.request().method() === 'POST')
