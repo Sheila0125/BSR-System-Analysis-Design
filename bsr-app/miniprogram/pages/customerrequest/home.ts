@@ -1,9 +1,10 @@
+import { rentalStoreName } from '../../shared/rentalChoices';
 import type { RentalRequestView } from './customerRequestApi';
 import { customerRequestApiForConfiguredOrigin } from './configuredApi';
 
 Page({
   data: {
-    requests: [] as ReadonlyArray<RentalRequestView>,
+    requests: [] as ReadonlyArray<RentalRequestView & { serviceStoreName: string }>,
     loading: false,
     errorMessage: '',
   },
@@ -12,7 +13,12 @@ Page({
     this.setData({ loading: true, requests: [], errorMessage: '' });
     try {
       const requests = await customerRequestApiForConfiguredOrigin().listRequests();
-      this.setData({ requests });
+      this.setData({
+        requests: requests.map(request => ({
+          ...request,
+          serviceStoreName: rentalStoreName(request.serviceStoreId),
+        })),
+      });
     } catch (error) {
       this.setData({ errorMessage: problemMessage(error, 'Could not load your rental requests.') });
     } finally {

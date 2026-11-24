@@ -17,3 +17,8 @@ export const equipmentOptions = [
 export function configuredRentalStores(): RentalStoreOption[] {
   return getApp<{ globalData?: { rentalStores?: RentalStoreOption[] } }>().globalData?.rentalStores ?? [];
 }
+
+export function rentalStoreName(storeId: string): string {
+  return configuredRentalStores().find(store => store.id === storeId)?.name.trim()
+    || '门店名称暂不可用';
+}

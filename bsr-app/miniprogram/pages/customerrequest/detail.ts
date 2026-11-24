@@ -1,3 +1,4 @@
+import { rentalStoreName } from '../../shared/rentalChoices';
 import {
   resubmitWithRetainedResponse,
   type RentalRequestView,
@@ -7,6 +8,7 @@ import { customerRequestApiForConfiguredOrigin } from './configuredApi';
 Page({
   data: {
     request: null as RentalRequestView | null,
+    serviceStoreName: '',
     loading: false,
     responseDraft: '',
     submitting: false,
@@ -16,10 +18,10 @@ Page({
 
   async onLoad(options: Record<string, string | undefined>) {
     const requestId = options['id'] ?? '';
-    this.setData({ request: null, responseDraft: '', loading: true, errorMessage: '', successMessage: '' });
+    this.setData({ request: null, serviceStoreName: '', responseDraft: '', loading: true, errorMessage: '', successMessage: '' });
     try {
       const request = await customerRequestApiForConfiguredOrigin().loadRequest(requestId);
-      this.setData({ request });
+      this.setData({ request, serviceStoreName: rentalStoreName(request.serviceStoreId) });
     } catch (error) {
       const detail = (error as { detail?: unknown }).detail;
       this.setData({
@@ -74,6 +76,7 @@ Page({
     }
     this.setData({
       request: outcome.request,
+      serviceStoreName: rentalStoreName(outcome.request.serviceStoreId),
       responseDraft: '',
       successMessage: 'Your information was sent and the request is pending review again.',
     });

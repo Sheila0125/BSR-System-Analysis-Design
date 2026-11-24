@@ -15,6 +15,7 @@ let page: PageHarness;
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
+  vi.stubGlobal('getApp', () => ({ globalData: { rentalStores: [{ id: '3', name: 'BSR 东谷门店（演示）' }] } }));
   vi.stubGlobal('Page', (options: PageHarness) => {
     page = { ...options, data: structuredClone(options.data), setData(patch) { Object.assign(this.data, patch); } };
   });
@@ -23,11 +24,11 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('AC-WX06 cross-channel refresh and customer switch', () => {
   it('clears previous customer request data before a switched or expired session can fail', async () => {
-    requestApi.listRequests.mockResolvedValueOnce([{ requestId: '91', status: 'SUBMITTED' }])
+    requestApi.listRequests.mockResolvedValueOnce([{ requestId: '91', serviceStoreId: '3', status: 'SUBMITTED' }])
       .mockRejectedValueOnce({ status: 401, detail: 'Sign in again' });
     await import(`../../pages/customerrequest/${'home'}.ts`);
     await page.onShow();
-    expect(page.data['requests']).toEqual([{ requestId: '91', status: 'SUBMITTED' }]);
+    expect(page.data['requests']).toEqual([{ requestId: '91', serviceStoreId: '3', serviceStoreName: 'BSR 东谷门店（演示）', status: 'SUBMITTED' }]);
     await page.onShow();
     expect(page.data['requests']).toEqual([]);
     expect(page.data['errorMessage']).toBe('Sign in again');
@@ -42,6 +43,16 @@ describe('AC-WX06 cross-channel refresh and customer switch', () => {
     await page.onShow();
     expect(page.data['current']).toEqual([]);
     expect(page.data['history']).toEqual([{ contractId: '91', status: 'ENDED' }]);
+  });
+
+  it('shows the configured store name for an existing request and handles a missing name', async () => {
+    requestApi.loadRequest.mockResolvedValueOnce({ requestId: '91', serviceStoreId: '3' })
+      .mockResolvedValueOnce({ requestId: '92', serviceStoreId: '99' });
+    await import(`../../pages/customerrequest/${'detail'}.ts`);
+    await page.onLoad({ id: '91' });
+    expect(page.data['serviceStoreName']).toBe('BSR 东谷门店（演示）');
+    await page.onLoad({ id: '92' });
+    expect(page.data['serviceStoreName']).toBe('门店名称暂不可用');
   });
 
   it('removes a previous customer request when the next account cannot read it', async () => {

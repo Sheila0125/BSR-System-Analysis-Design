@@ -8,7 +8,7 @@
       <view class="data-row"><text class="data-label">租赁开始</text><text class="data-value">{{request.rentalStartDate}}</text></view>
       <view class="data-row"><text class="data-label">租赁时长</text><text class="data-value">{{request.rentalDays}} 天</text></view>
       <view class="data-row"><text class="data-label">滑雪水平</text><text class="data-value">{{ui.label(request.skillLevel)}}</text></view>
-      <view class="data-row"><text class="data-label">服务门店</text><text class="data-value">{{request.serviceStoreId}}</text></view>
+      <view class="data-row"><text class="data-label">服务门店</text><text class="data-value">{{serviceStoreName}}</text></view>
     </view>
     <view class="detail-card"><text class="section-title">所需装备</text><view wx:for="{{request.items}}" wx:key="index" class="item-card"><view class="card-row"><text class="item-name">{{ui.label(item.equipmentCategory)}}</text><text class="data-value">× {{item.quantity}}</text></view><text wx:if="{{item.fittingNote}}" class="item-meta">{{item.fittingNote}}</text></view></view>
     <view wx:if="{{request.supplements.length > 0}}" class="detail-card"><text class="section-title">资料补充记录</text><view wx:for="{{request.supplements}}" wx:key="cycleNumber" class="supplement-cycle"><text class="cycle-number">第 {{item.cycleNumber}} 次补充</text><text class="cycle-reason">{{item.reason}}</text><text wx:if="{{item.customerResponse}}" class="item-meta">我的回复：{{item.customerResponse}}</text><text wx:else class="item-meta">等待你的回复</text></view></view>

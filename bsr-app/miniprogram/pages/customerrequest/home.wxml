@@ -18,7 +18,7 @@
   <view wx:for="{{requests}}" wx:key="requestId" class="request-card" data-request-id="{{item.requestId}}" bindtap="openDetail">
     <view class="card-row"><text class="request-card__number break-id">{{item.requestNumber}}</text><text class="status-badge">{{ui.label(item.status)}}</text></view>
     <view class="request-card__date"><text>{{item.rentalStartDate}}</text><text>{{item.rentalDays}} 天 · {{ui.label(item.skillLevel)}}</text></view>
-    <view class="request-card__footer"><text>服务门店 · {{item.serviceStoreId}}</text><text>查看详情 ›</text></view>
+    <view class="request-card__footer"><text>服务门店 · {{item.serviceStoreName}}</text><text>查看详情 ›</text></view>
   </view>
   <view class="bottom-nav"><view class="nav-item nav-item--active"><text class="nav-icon">▤</text>租赁申请</view><navigator class="nav-item" url="/pages/rental/list" open-type="reLaunch"><text class="nav-icon">≡</text>我的租赁</navigator><navigator class="nav-item" url="/pages/customerrequest/profile" open-type="reLaunch"><text class="nav-icon">↕</text>我的资料</navigator></view>
 </view>
