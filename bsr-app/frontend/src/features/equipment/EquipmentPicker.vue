@@ -21,6 +21,8 @@ const emit = defineEmits<{ selection: [items: AvailableEquipment[]] }>()
 const { options: equipment, loading, error, refresh } = useStoreOptions(toRef(props, 'storeId'),
   id => loadAvailableEquipment(id, '', ''))
 const chosenId = ref('')
+const quantity = ref(1)
+const removedNumbers = ref<string[]>([])
 const selectedIds = ref<string[]>([])
 const selected = computed(() => selectedIds.value.flatMap(id => {
   const item = equipment.value.find(row => row.equipmentId === id)
@@ -49,6 +51,31 @@ const remaining = computed(() => equipment.value.filter(row => {
   const required = requiredQuantities.value.get(row.equipmentCategory) ?? 0
   return required > (selectedQuantities.value.get(row.equipmentCategory) ?? 0)
 }))
+function groupKey(item: AvailableEquipment) {
+  return props.transfer ? item.equipmentId
+    : JSON.stringify([item.equipmentName, item.equipmentCategory, item.skillLevel, item.currentDailyRate])
+}
+const groups = computed(() => {
+  const result = new Map<string, { first: AvailableEquipment; items: AvailableEquipment[] }>()
+  for (const item of remaining.value) {
+    const key = groupKey(item)
+    const group = result.get(key)
+    if (group) group.items.push(item)
+    else result.set(key, { first: item, items: [item] })
+  }
+  return [...result.values()]
+})
+const chosenGroup = computed(() => groups.value.find(group => group.first.equipmentId === chosenId.value))
+const limit = computed(() => {
+  const group = chosenGroup.value
+  if (!group) return 0
+  const category = group.first.equipmentCategory
+  const required = requiredQuantities.value.get(category)
+  if (required === undefined) return group.items.length
+  return Math.min(group.items.length, required - (selectedQuantities.value.get(category) ?? 0))
+})
+const canAdd = computed(() => !loading.value && !error.value && Number.isInteger(quantity.value)
+  && quantity.value > 0 && quantity.value <= limit.value)
 const progress = computed(() => [...requiredQuantities.value].map(([equipmentCategory, quantity]) => ({
   equipmentCategory,
   quantity,
@@ -56,19 +83,42 @@ const progress = computed(() => [...requiredQuantities.value].map(([equipmentCat
 })))
 
 watch(() => props.storeId, clearSelection)
-watch(selectedIds, () => emit('selection', selected.value))
+watch(chosenId, () => { quantity.value = 1 })
+watch(equipment, (rows, previous) => {
+  const available = new Set(rows.map(item => item.equipmentId))
+  const missing = selectedIds.value.filter(id => !available.has(id))
+  if (missing.length) {
+    removedNumbers.value = previous.filter(row => missing.includes(row.equipmentId)).map(row => row.inventoryNumber)
+    selectedIds.value = selectedIds.value.filter(id => available.has(id))
+  }
+})
+watch([selected, loading, error], () => emit('selection', loading.value || error.value ? [] : selected.value))
 function clearSelection() {
   chosenId.value = ''
   selectedIds.value = []
+  removedNumbers.value = []
 }
 function reload() {
-  clearSelection()
+  chosenId.value = ''
+  removedNumbers.value = []
   refresh()
 }
 function add() {
-  if (!remaining.value.some(row => row.equipmentId === chosenId.value)) return
-  selectedIds.value = [...selectedIds.value, chosenId.value]
+  if (!canAdd.value || !chosenGroup.value) return
+  const added = chosenGroup.value.items.slice(0, quantity.value)
+  selectedIds.value = [...selectedIds.value, ...added.map(item => item.equipmentId)]
   chosenId.value = ''
+}
+function alternatives(item: AvailableEquipment) {
+  const key = groupKey(item)
+  return equipment.value.filter(row => groupKey(row) === key
+    && (row.equipmentId === item.equipmentId || !selectedIds.value.includes(row.equipmentId)))
+}
+function swap(item: AvailableEquipment, event: Event) {
+  const id = (event.target as HTMLSelectElement).value
+  if (alternatives(item).some(row => row.equipmentId === id)) {
+    selectedIds.value = selectedIds.value.map(current => current === item.equipmentId ? id : current)
+  }
 }
 </script>
 
@@ -102,19 +152,30 @@ function add() {
           {{ loading ? '正在加载雪具…' : remaining.length ? '选择雪具' : '暂无可选雪具' }}
         </option>
         <option
-          v-for="item in error ? [] : remaining"
-          :key="item.equipmentId"
-          :value="item.equipmentId"
-          :title="item.inventoryNumber"
+          v-for="group in error ? [] : groups"
+          :key="group.first.equipmentId"
+          :value="group.first.equipmentId"
         >
-          {{ conciseEquipmentName(item.equipmentName) }} · {{ uiText(item.equipmentCategory) }} · {{ uiText(item.skillLevel) }} · {{ conciseInventoryNumber(item.inventoryNumber) }}{{ transfer ? '' : ` · ${item.currentDailyRate} NOK / 日` }}
+          {{ conciseEquipmentName(group.first.equipmentName) }} · {{ uiText(group.first.equipmentCategory) }} · {{ uiText(group.first.skillLevel) }}{{ transfer ? '' : ` · ${group.first.currentDailyRate} NOK / 日` }} · {{ group.items.length === 1 ? conciseInventoryNumber(group.first.inventoryNumber) : `可选 ${group.items.length} 件` }}
         </option>
       </select>
+    </label>
+    <label v-if="chosenGroup && !transfer">
+      配货数量
+      <input
+        v-model.number="quantity"
+        type="number"
+        aria-label="配货数量"
+        min="1"
+        :max="limit"
+        step="1"
+      >
+      <small>本次最多 {{ limit }} 件</small>
     </label>
     <div class="picker-actions">
       <button
         type="button"
-        :disabled="loading || !!error || !chosenId"
+        :disabled="!canAdd"
         @click="add"
       >
         添加雪具
@@ -133,8 +194,14 @@ function add() {
     >
       {{ error }}
     </p>
+    <p
+      v-if="removedNumbers.length"
+      role="status"
+    >
+      已移除不可用的库存编号：{{ removedNumbers.join('、') }}。
+    </p>
     <ul
-      v-if="selected.length"
+      v-if="selected.length && !error"
       aria-label="已选雪具"
     >
       <li
@@ -143,6 +210,23 @@ function add() {
         :title="item.inventoryNumber"
       >
         {{ conciseEquipmentName(item.equipmentName) }} · {{ uiText(item.equipmentCategory) }} · {{ conciseInventoryNumber(item.inventoryNumber) }}{{ transfer ? '' : ` · ${item.currentDailyRate} NOK / 日` }}
+        <label v-if="!transfer && alternatives(item).length > 1">
+          更换实物编号
+          <select
+            :value="item.equipmentId"
+            :aria-label="`更换 ${item.inventoryNumber}`"
+            :disabled="loading"
+            @change="swap(item, $event)"
+          >
+            <option
+              v-for="option in alternatives(item)"
+              :key="option.equipmentId"
+              :value="option.equipmentId"
+            >
+              {{ option.inventoryNumber }}
+            </option>
+          </select>
+        </label>
         <button
           type="button"
           :aria-label="`移除 ${item.inventoryNumber}`"

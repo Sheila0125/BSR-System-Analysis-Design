@@ -51,3 +51,48 @@ it('AC-UC04 failed refresh clears obsolete availability and selection', async ()
   expect(wrapper.find('option[value="9007199254740993"]').exists()).toBe(false)
   expect(wrapper.emitted('selection')?.at(-1)).toEqual([[]])
 })
+
+it('groups matching models and rates and assigns only the requested number of distinct pieces', async () => {
+  const twin = { ...item, equipmentId: '2', inventoryNumber: 'INV-02' }
+  const spare = { ...item, equipmentId: '3', inventoryNumber: 'INV-03' }
+  api.loadAvailableEquipment.mockResolvedValue([
+    item, twin, spare,
+    { ...item, equipmentId: '4', currentDailyRate: '105.00' },
+    { ...item, equipmentId: '5', equipmentName: 'Atomic Redster 165 cm' },
+    { ...item, equipmentId: '6', skillLevel: 'BEGINNER' },
+  ])
+  const wrapper = mount(EquipmentPicker, { props: { storeId: '3', requirements: [{ equipmentCategory: 'SKI', quantity: 2 }] } })
+  await flushPromises()
+  const models = wrapper.get('[aria-label="可租雪具"]')
+  expect(models.findAll('option:not([disabled])')).toHaveLength(4)
+  await models.setValue(item.equipmentId)
+  const quantity = wrapper.get('[aria-label="配货数量"]')
+  expect(quantity.attributes('max')).toBe('2')
+  await quantity.setValue(3)
+  expect(wrapper.findAll('button')[0]!.attributes('disabled')).toBeDefined()
+  await quantity.setValue(2)
+  await wrapper.findAll('button')[0]!.trigger('click')
+  expect(wrapper.emitted('selection')?.at(-1)).toEqual([[item, twin]])
+  const swap = wrapper.get('[aria-label="更换 INV-PICK"]')
+  expect(swap.find('option[value="2"]').exists()).toBe(false)
+  expect(swap.find('option[value="4"]').exists()).toBe(false)
+  await swap.setValue(spare.equipmentId)
+  expect(wrapper.emitted('selection')?.at(-1)).toEqual([[spare, twin]])
+  expect(wrapper.get('[aria-label="配货进度"]').text()).toContain('双板 2 / 2')
+})
+
+it('rechecks selected pieces by ID, updates rates and identifies the missing inventory number', async () => {
+  const twin = { ...item, equipmentId: '2', inventoryNumber: 'INV-02' }
+  const repriced = { ...twin, currentDailyRate: '110.00' }
+  api.loadAvailableEquipment.mockResolvedValueOnce([item, twin]).mockResolvedValueOnce([repriced])
+  const wrapper = mount(EquipmentPicker, { props: { storeId: '3' } })
+  await flushPromises()
+  await wrapper.get('[aria-label="可租雪具"]').setValue(item.equipmentId)
+  await wrapper.get('[aria-label="配货数量"]').setValue(2)
+  await wrapper.findAll('button')[0]!.trigger('click')
+  await wrapper.findAll('button')[1]!.trigger('click')
+  await flushPromises()
+  expect(wrapper.emitted('selection')?.at(-1)).toEqual([[repriced]])
+  expect(wrapper.get('[role="status"]').text()).toContain('INV-PICK')
+  expect(wrapper.get('[aria-label="已选雪具"]').text()).toContain('110.00')
+})

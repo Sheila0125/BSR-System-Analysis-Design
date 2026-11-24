@@ -27,6 +27,7 @@ const changes = ref<ChangeRequest[]>([])
 const contract = ref<Contract | null>(null)
 const pendingItems = ref<string[]>([])
 const busy = ref(false)
+const pollFailed = ref(false)
 const error = ref('')
 const invoiceOpen = ref(false)
 const invoiceVersion = ref(0)
@@ -57,6 +58,33 @@ const selectionMatchesRequest = computed(() => {
     && requestRequirements.value.every(item => actual.get(item.equipmentCategory) === item.quantity)
 })
 watch(storeId, () => { sourceRequestId.value = ''; contracts.value = []; changes.value = []; contract.value = null; selection.value = []; replacementSelection.value = []; pendingItems.value = [] })
+const waitingContractId = computed(() => {
+  const current = contract.value
+  return !busy.value && current && ['PENDING_CONFIRMATION', 'PENDING_PAYMENT'].includes(current.status)
+    ? current.contractId : ''
+})
+watch([storeId, waitingContractId], ([, id], _, onCleanup) => {
+  pollFailed.value = false
+  if (!id) return
+  let active = true
+  let timer = window.setTimeout(poll, 5000)
+  onCleanup(() => {
+    active = false
+    window.clearTimeout(timer)
+  })
+  async function poll() {
+    try {
+      const latest = await rentalApi.read(id)
+      if (!active) return
+      pollFailed.value = false
+      if (latest.status !== contract.value?.status) selectContract(latest)
+    } catch {
+      if (active) pollFailed.value = true
+    } finally {
+      if (active) timer = window.setTimeout(poll, 5000)
+    }
+  }
+}, { flush: 'sync' })
 async function run(operation: () => Promise<void>) {
   if (busy.value) return
   busy.value = true
@@ -71,6 +99,8 @@ function selectContract(value: Contract) {
     invoiceOpen.value = false
   }
   contract.value = value; pendingItems.value = []
+  const index = contracts.value.findIndex(row => row.contractId === value.contractId)
+  if (index !== -1) contracts.value[index] = value
   invoiceVersion.value++
 }
 function load() { return run(async () => {
@@ -252,6 +282,23 @@ function action(kind: 'submit' | 'cancel' | 'issue') { return run(async () => {
     <article v-if="contract">
       <h2>{{ contractKeywords(contract, categories) }} · {{ uiText(contract.status) }}</h2>
       <p>合同编号 {{ contract.contractNumber }}</p>
+      <div role="status">
+        <p v-if="contract.status === 'DRAFT'">
+          核对雪具和租金后，点「提交顾客确认」。
+        </p>
+        <p v-else-if="contract.status === 'PENDING_CONFIRMATION'">
+          请顾客在小程序「我的租赁」打开这份合同，核对后点「确认合同并模拟付款」。本页每 5 秒自动查询办理进度。
+        </p>
+        <p v-else-if="contract.status === 'PENDING_PAYMENT'">
+          顾客已确认合同。请顾客在小程序完成模拟付款，或在收到外部付款后登记交易。本页会自动更新付款状态。
+        </p>
+        <p v-else-if="contract.status === 'PENDING_ISSUE'">
+          已可发放。请核对实物库存编号，勾选本次交给顾客的雪具，再点「登记所选雪具发放」。
+        </p>
+        <p v-if="pollFailed">
+          暂时未能更新状态，稍后将自动重试，也可手动刷新。
+        </p>
+      </div>
       <p>顾客 {{ contract.customerId }} · {{ contract.rentalStartDate }} · {{ contract.rentalDays }} 整日 · 合同应付合计 {{ contract.amountDue }}</p>
       <button
         type="button"

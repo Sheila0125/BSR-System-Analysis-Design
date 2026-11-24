@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, expect, it, vi } from 'vitest'
 import RentalDeskView from './RentalDeskView.vue'
 import EquipmentPicker from '../equipment/EquipmentPicker.vue'
+import type { Contract } from './rentalApi'
 const api = vi.hoisted(() => ({ list: vi.fn(), changes: vi.fn(), create: vi.fn(), revise: vi.fn(), read: vi.fn(), submit: vi.fn(), cancel: vi.fn(), issue: vi.fn(), transactions: vi.fn(), record: vi.fn() }))
 vi.mock('./rentalApi', () => ({ rentalApi: api }))
 const requestApi = vi.hoisted(() => ({ loadEmployeeRentalRequests: vi.fn() }))
@@ -190,4 +191,73 @@ it('automatically opens a sole current contract and uses equipment keywords on i
   expect(card.text()).not.toContain('RC-REFERENCE')
   expect(card.attributes('aria-pressed')).toBe('true')
   expect(wrapper.get('article').text()).toContain('RC-REFERENCE')
+})
+
+function waitingContract(id: string): Contract {
+  return {
+    contractId: id, contractNumber: `RC-${id}`, customerId: '2', serviceStoreId: '3',
+    sourceRequestId: '1', rentalStartDate: '2026-12-20', rentalDays: 1, amountDue: '100.00',
+    status: 'PENDING_CONFIRMATION', charges: [], items: [{
+      itemId: '8', equipmentId: '4', dailyRateSnapshot: '100.00', status: 'PENDING_ISSUE',
+      checkedOutAt: null, returnedAt: null, returnStoreId: null, active: true,
+    }],
+  }
+}
+
+it('follows customer confirmation and payment until the employee can issue the equipment', async () => {
+  vi.useFakeTimers()
+  const pending = waitingContract('7')
+  api.list.mockResolvedValue([pending])
+  api.changes.mockResolvedValue([])
+  api.read.mockRejectedValueOnce(new Error('Connection lost'))
+    .mockResolvedValueOnce({ ...pending, status: 'PENDING_PAYMENT' })
+    .mockResolvedValue({ ...pending, status: 'PENDING_ISSUE' })
+  const wrapper = mount(RentalDeskView, sessionOptions(['3']))
+  try {
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === '查询合同与变更需求')!.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('article').text()).toContain('确认合同并模拟付款')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(wrapper.get('article').text()).toContain('重试')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(wrapper.get('[data-test="contract-7"]').text()).toContain('待付款')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(wrapper.get('[data-test="contract-7"]').text()).toContain('待发放')
+    expect(wrapper.get('article').text()).toContain('登记所选雪具发放')
+    await vi.advanceTimersByTimeAsync(15000)
+    expect(api.read).toHaveBeenCalledTimes(3)
+  } finally {
+    wrapper.unmount()
+    vi.useRealTimers()
+  }
+})
+
+it('ignores an outstanding poll after switching contracts and stops when the desk closes', async () => {
+  vi.useFakeTimers()
+  const first = waitingContract('7')
+  const second = waitingContract('9')
+  api.list.mockResolvedValue([first, second])
+  api.changes.mockResolvedValue([])
+  let resolveRead!: (contract: Contract) => void
+  api.read.mockReturnValueOnce(new Promise<Contract>(resolve => { resolveRead = resolve }))
+  const wrapper = mount(RentalDeskView, sessionOptions(['3']))
+  try {
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === '查询合同与变更需求')!.trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="contract-7"]').trigger('click')
+    await vi.advanceTimersByTimeAsync(15000)
+    expect(api.read).toHaveBeenCalledTimes(1)
+    await wrapper.get('[data-test="contract-9"]').trigger('click')
+    resolveRead({ ...first, status: 'PENDING_ISSUE' })
+    await flushPromises()
+    expect(wrapper.get('article').text()).toContain('RC-9')
+    expect(wrapper.get('[data-test="contract-9"]').text()).toContain('待确认')
+  } finally {
+    wrapper.unmount()
+    await vi.advanceTimersByTimeAsync(15000)
+    vi.useRealTimers()
+  }
+  expect(api.read).toHaveBeenCalledTimes(1)
 })

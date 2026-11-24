@@ -1,13 +1,8 @@
 import { rentalAccessLost, rentalProblem, type RentalInvoice, type InvoiceCharge } from './rentalApi';
 import { configuredRentalApi } from './configuredApi';
 
-// A request identifier, never an authentication token. The server also serializes the charge balance.
-function requestKey(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, char => {
-    const value=Math.floor(Math.random()*16);
-    return (char==='x' ? value : (value & 3) | 8).toString(16);
-  });
-}
+import { requestKey } from './paymentKey';
+
 Page({
   data: { id:'', invoice:null as RentalInvoice | null, selectedCharge:null as InvoiceCharge | null,
     outcome:'SUCCEEDED' as 'SUCCEEDED' | 'FAILED', attemptKey:'', loading:false, paying:false, error:'', paymentMessage:'' },

@@ -7,8 +7,11 @@
       <text class="section-title">计费依据</text>
       <text class="description">初始租金为各件装备日租金快照 × 约定整日天数后求和；历史快照不随现价变动。按 Europe/Oslo 本地日历整日计费，不按小时折算。</text>
       <text class="description">普通提前归还不自动退款。正式调整只退尚未开始的剩余整日，新增装备包含调整当日。合同应付合计包含已确认调整，不是当前未付余额；补缴、退款及办理状态请核对下方费用和变更记录。</text>
-      <button wx:if="{{contract.status === 'PENDING_CONFIRMATION'}}" type="primary" bindtap="confirm">核对并确认合同</button>
-      <button class="invoice-entry button-secondary" bindtap="viewInvoice">查看发票 / 模拟付款</button>
+      <text wx:if="{{paymentMessage}}" class="notice">{{paymentMessage}}</text>
+      <button wx:if="{{payable && (contract.status === 'PENDING_CONFIRMATION' || contract.status === 'PENDING_PAYMENT')}}" type="primary" bindtap="payInitial" disabled="{{deciding || loading}}" loading="{{deciding}}">{{contract.status === 'PENDING_CONFIRMATION' ? (payable * 1 === 0 ? '确认零元合同' : '确认合同并模拟付款') : '继续模拟付款'}} · {{payable}} NOK</button>
+      <text wx:if="{{payable}}" class="caption">课堂模拟付款，不会扣款。</text>
+      <button wx:if="{{contract.status === 'PENDING_CONFIRMATION'}}" class="button-plain" disabled="{{deciding}}" bindtap="confirm">其他办理方式 · 仅确认或退回</button>
+      <button class="invoice-entry button-secondary" disabled="{{deciding}}" bindtap="viewInvoice">查看发票 / 模拟付款</button>
       <text wx:if="{{contract.status === 'ENDED'}}" class="notice">如仍在原租赁日期内，已归还装备尚有未完成的正式退款，可提交后续减租申请，由门店核对。</text>
       <button wx:if="{{contract.status === 'ACTIVE' || contract.status === 'ENDED'}}" class="button-secondary" bindtap="requestChange">{{contract.status === 'ENDED' ? '申请后续正式退款' : '申请变更 / 部分归还'}}</button>
     </view>

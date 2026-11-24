@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const api = vi.hoisted(() => ({ read: vi.fn(), changes: vi.fn(), transactions: vi.fn(), adjustment: vi.fn(), decideAdjustment: vi.fn(), submitChange: vi.fn() }));
+const api = vi.hoisted(() => ({ read: vi.fn(), decide: vi.fn(), invoice: vi.fn(), simulate: vi.fn(), changes: vi.fn(), transactions: vi.fn(), adjustment: vi.fn(), decideAdjustment: vi.fn(), submitChange: vi.fn() }));
 vi.mock('../../pages/rental/configuredApi', () => ({ configuredRentalApi: () => api }));
 type PageHarness = {
   data: Record<string, unknown>; setData(patch: Record<string, unknown>): void;
   onLoad(options: Record<string, string>): void | Promise<void>; onShow(): Promise<void>;
   submit(): Promise<void>; reviewChange(event: { currentTarget: { dataset: { id: string } } }): Promise<void>;
+  payInitial(): Promise<void>;
   confirmAdjustment(): Promise<void>;
   returned(event: { detail: { value: string[] } }): void;
   type(event: { detail: { value: string } }): void;
@@ -86,4 +87,37 @@ it('AC-WX02/03 native WXML conditions are real bindings and quote confirmation i
   expect(detail).toContain("contract.status === 'ACTIVE' || contract.status === 'ENDED'");
   const change = readFileSync(new URL('../../pages/rental/change.wxml', import.meta.url), 'utf8');
   expect(change).toContain("contract.status !== 'ACTIVE' && contract.status !== 'ENDED'");
+});
+
+it('one tap confirms once, retries a lost payment response with the same key and shows the settled contract', async () => {
+  const contract = { contractId: '91', status: 'PENDING_CONFIRMATION', amountDue: '195.00', charges: [] };
+  const confirmed = { ...contract, status: 'PENDING_PAYMENT' };
+  api.read.mockResolvedValueOnce(contract).mockResolvedValueOnce(confirmed).mockResolvedValueOnce({ ...contract, status: 'PENDING_ISSUE' });
+  api.changes.mockResolvedValue([]);
+  api.decide.mockResolvedValue(confirmed);
+  api.invoice.mockResolvedValue({ charges: [{ chargeId: '8', type: 'INITIAL', outstandingAmount: '195.00', canSimulatePayment: true }] });
+  api.simulate.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ status: 'SUCCEEDED' });
+  await loadPage('detail');
+  await page.onLoad({ id: '91' }); await page.onShow();
+  const first = page.payInitial();
+  await page.payInitial(); await first;
+  expect(api.decide).toHaveBeenCalledTimes(1);
+  expect(api.simulate).toHaveBeenCalledTimes(1);
+  await page.payInitial();
+  expect(api.decide).toHaveBeenCalledTimes(1);
+  expect(api.simulate.mock.calls[1]).toEqual(api.simulate.mock.calls[0]);
+  expect(page.data['paymentMessage']).toContain('模拟付款成功');
+  expect(page.data['payable']).toBe('');
+});
+
+it('does not pay a different outstanding amount from the amount shown', async () => {
+  const contract = { contractId: '91', status: 'PENDING_CONFIRMATION', amountDue: '195.00', charges: [] };
+  api.read.mockResolvedValue(contract);
+  api.changes.mockResolvedValue([]);
+  api.decide.mockResolvedValue({ ...contract, status: 'PENDING_PAYMENT' });
+  api.invoice.mockResolvedValue({ charges: [{ chargeId: '8', type: 'INITIAL', outstandingAmount: '210.00', canSimulatePayment: true }] });
+  await loadPage('detail'); await page.onLoad({ id: '91' }); await page.onShow();
+  await page.payInitial();
+  expect(api.simulate).not.toHaveBeenCalled();
+  expect(page.data['paymentMessage']).toContain('核对最新金额');
 });
