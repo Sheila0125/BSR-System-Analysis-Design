@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import trialCode from './bsr-wechat-trial-20261128.png'
+import trialCode from './bsr-wechat-trial-20261201.png'
 
 const configured = import.meta.env.VITE_MINIPROGRAM_QR_IMAGE?.trim()
-const trialExpiresAt = Date.parse('2026-11-28T00:00:00+08:00')
+const trialExpiresAt = Date.parse('2026-12-01T00:00:00+08:00')
 const image = configured === undefined
   ? (Date.now() < trialExpiresAt ? trialCode : '')
   : ((/^\/(?!\/)/.test(configured) || /^https:\/\//.test(configured)) ? configured : '')
@@ -29,10 +29,10 @@ const showTrialCode = image === trialCode
       <div v-if="showTrialCode">
         <h2>扫码体验装备租赁</h2>
         <p class="deadline">
-          此体验码在 11 月 28 日前有效。
+          此体验码在 12 月 1 日前有效。
         </p>
         <ol>
-          <li>使用已添加为体验成员的微信号扫码。</li>
+          <li>使用已添加为体验成员的微信号，扫描本页的体验版二维码。</li>
           <li>域名仍在提交审核阶段。点右上角「…」→「打开调试」，按提示重启。若菜单显示「关闭调试」，可直接登录。</li>
           <li>用顾客账号登录，进入「租赁申请」，选择门店、装备和租期。提交后可在申请详情查看进度。</li>
         </ol>
