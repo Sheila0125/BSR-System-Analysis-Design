@@ -17,7 +17,7 @@ it('selecting a listed contract loads its returnable items and supports selectin
     { itemId: '22', equipmentId: '32', status: 'RETURNED', returnedAt: '2026-11-23T10:00:00' },
   ] })
   const wrapper = mount(RentalReturnView, sessionOptions(['4']))
-  await wrapper.get('[aria-label="接收门店编号"]').setValue('4')
+  await wrapper.get('[aria-label="合同所属门店"]').setValue('4')
   await flushPromises()
   expect(wrapper.get('[data-test="contract-20"]').attributes('aria-pressed')).toBe('true')
   expect(api.returnLookup).toHaveBeenCalledWith('20', '4')
@@ -28,15 +28,22 @@ it('selecting a listed contract loads its returnable items and supports selectin
   expect(checkbox.element.checked).toBe(true)
   expect(api.returns).not.toHaveBeenCalled()
 })
-it('AC-UC06 cross-store return failure retains selected item and fault description', async () => {
+it('AC-UC06 selects a cross-store contract without entering its identifier and retains failed return input', async () => {
+  api.list.mockImplementation(async storeId => storeId === '3' ? [{
+    contractId: '91', contractNumber: 'RC-91', customerId: '2', serviceStoreId: '3', sourceRequestId: '1',
+    rentalStartDate: '2026-11-23', rentalDays: 1, amountDue: '100.00', status: 'ACTIVE', charges: [],
+    items: [{ itemId: '92', equipmentId: '93', active: true, status: 'RENTED', dailyRateSnapshot: '100.00', checkedOutAt: '2026-11-23T08:00:00', returnedAt: null, returnStoreId: null }],
+  }] : [])
   api.returnLookup.mockResolvedValue({ contractId: '91', status: 'ACTIVE', items: [{ itemId: '92', equipmentId: '93', status: 'RENTED', returnedAt: null }] })
   api.returns.mockRejectedValue(new Error('offline'))
-  const wrapper = mount(RentalReturnView, sessionOptions(['4']))
-  await wrapper.get('select[aria-label="接收门店编号"]').setValue('4')
-  await wrapper.findAll('button').find(button => button.text().includes('跨店'))!.trigger('click')
-  await wrapper.get('input[inputmode="numeric"]').setValue('91')
-  await wrapper.findAll('button').find(button => button.text() === '查询归还所需信息')!.trigger('click')
+  const wrapper = mount(RentalReturnView, sessionOptions(['3', '4']))
+  await wrapper.get('select[aria-label="合同所属门店"]').setValue('3')
   await flushPromises()
+  await wrapper.get('[data-test="contract-91"]').trigger('click')
+  await wrapper.get('select[aria-label="实际接收门店"]').setValue('4')
+  await flushPromises()
+  expect(wrapper.find('input[inputmode="numeric"]').exists()).toBe(false)
+  expect(api.returnLookup).toHaveBeenLastCalledWith('91', '4')
   await wrapper.get('input[type="checkbox"]').setValue(true)
   await wrapper.get('article select').setValue('FAULT')
   await wrapper.get('textarea').setValue('Real fault retained')
