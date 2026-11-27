@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import trialCode from './bsr-wechat-trial-20261201.png'
+import trialCode from './bsr-wechat-trial-20261204.png'
 
 const configured = import.meta.env.VITE_MINIPROGRAM_QR_IMAGE?.trim()
-const trialExpiresAt = Date.parse('2026-12-01T00:00:00+08:00')
+const trialExpiresAt = Date.parse('2026-12-04T00:00:00+08:00')
 const image = configured === undefined
   ? (Date.now() < trialExpiresAt ? trialCode : '')
   : ((/^\/(?!\/)/.test(configured) || /^https:\/\//.test(configured)) ? configured : '')
@@ -29,7 +29,7 @@ const showTrialCode = image === trialCode
       <div v-if="showTrialCode">
         <h2>扫码体验装备租赁</h2>
         <p class="deadline">
-          此体验码在 12 月 1 日前有效。
+          此体验码在 12 月 4 日前有效。
         </p>
         <ol>
           <li>使用已添加为体验成员的微信号，扫描本页的体验版二维码。</li>
